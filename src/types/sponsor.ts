@@ -30,7 +30,7 @@ export interface EnrichedSponsor extends Sponsor {
   domain?: string;
   emails: string[];
   linkedinUrl?: string;
-  enrichmentStatus: 'pending' | 'processing' | 'complete' | 'failed';
+  enrichmentStatus: 'pending' | 'processing' | 'complete' | 'partial' | 'failed';
 }
 
 export interface EmailDraft {
