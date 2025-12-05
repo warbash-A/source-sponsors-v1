@@ -22,7 +22,7 @@ export function EventDiscoveryResults({
   onToggleEvent,
   dataSource,
 }: EventDiscoveryResultsProps) {
-  const sourceInfo = sourceLabels[dataSource];
+  const sourceInfo = sourceLabels[dataSource] || sourceLabels.sample;
 
   return (
     <div className="space-y-4 animate-fade-in">
