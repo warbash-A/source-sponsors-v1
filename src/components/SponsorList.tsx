@@ -148,6 +148,7 @@ function EnrichmentStatusBadge({ status }: { status: EnrichedSponsor['enrichment
     pending: { label: "Pending", className: "bg-muted text-muted-foreground" },
     processing: { label: "Processing", className: "bg-primary/20 text-primary" },
     complete: { label: "Complete", className: "bg-success/20 text-success" },
+    partial: { label: "Partial", className: "bg-warning/20 text-warning" },
     failed: { label: "Failed", className: "bg-destructive/20 text-destructive" },
   };
 
