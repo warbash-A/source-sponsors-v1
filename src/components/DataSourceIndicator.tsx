@@ -34,7 +34,7 @@ const sourceConfig = {
 };
 
 export function DataSourceIndicator({ source, fallbackReason }: DataSourceIndicatorProps) {
-  const config = sourceConfig[source];
+  const config = sourceConfig[source] || sourceConfig.sample;
   const Icon = config.icon;
 
   return (
