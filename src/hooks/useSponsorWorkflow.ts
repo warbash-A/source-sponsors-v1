@@ -1,4 +1,6 @@
 import { useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type {
   EventDetails,
   DiscoveredEvent,
@@ -7,156 +9,6 @@ import type {
   WorkflowStep,
   ExportFormat,
 } from "@/types/sponsor";
-
-// Sample data for demo mode
-const sampleEvents: DiscoveredEvent[] = [
-  {
-    id: "1",
-    name: "TechCrunch Disrupt 2024",
-    date: "Oct 28-30, 2024",
-    location: "San Francisco, CA",
-    url: "https://techcrunch.com/events/disrupt-2024",
-    source: "sample",
-    sponsorCount: 45,
-  },
-  {
-    id: "2",
-    name: "Web Summit 2024",
-    date: "Nov 11-14, 2024",
-    location: "Lisbon, Portugal",
-    url: "https://websummit.com",
-    source: "sample",
-    sponsorCount: 120,
-  },
-  {
-    id: "3",
-    name: "SaaStr Annual 2024",
-    date: "Sep 10-12, 2024",
-    location: "San Francisco, CA",
-    url: "https://saastr.com/annual",
-    source: "sample",
-    sponsorCount: 85,
-  },
-  {
-    id: "4",
-    name: "Collision 2024",
-    date: "Jun 17-20, 2024",
-    location: "Toronto, Canada",
-    url: "https://collisionconf.com",
-    source: "sample",
-    sponsorCount: 65,
-  },
-  {
-    id: "5",
-    name: "SXSW Interactive 2024",
-    date: "Mar 8-16, 2024",
-    location: "Austin, TX",
-    url: "https://sxsw.com",
-    source: "sample",
-    sponsorCount: 200,
-  },
-];
-
-const sampleSponsors: EnrichedSponsor[] = [
-  {
-    id: "s1",
-    name: "Stripe",
-    tier: "platinum",
-    website: "https://stripe.com",
-    domain: "stripe.com",
-    events: ["1", "2", "3"],
-    emails: ["partnerships@stripe.com", "events@stripe.com"],
-    linkedinUrl: "https://linkedin.com/company/stripe",
-    enrichmentStatus: "complete",
-  },
-  {
-    id: "s2",
-    name: "Salesforce",
-    tier: "platinum",
-    website: "https://salesforce.com",
-    domain: "salesforce.com",
-    events: ["1", "2", "4"],
-    emails: ["sponsorships@salesforce.com"],
-    linkedinUrl: "https://linkedin.com/company/salesforce",
-    enrichmentStatus: "complete",
-  },
-  {
-    id: "s3",
-    name: "HubSpot",
-    tier: "gold",
-    website: "https://hubspot.com",
-    domain: "hubspot.com",
-    events: ["2", "3"],
-    emails: ["events@hubspot.com", "marketing@hubspot.com"],
-    linkedinUrl: "https://linkedin.com/company/hubspot",
-    enrichmentStatus: "complete",
-  },
-  {
-    id: "s4",
-    name: "MongoDB",
-    tier: "gold",
-    website: "https://mongodb.com",
-    domain: "mongodb.com",
-    events: ["1", "5"],
-    emails: ["partnerships@mongodb.com"],
-    linkedinUrl: "https://linkedin.com/company/mongodb",
-    enrichmentStatus: "complete",
-  },
-  {
-    id: "s5",
-    name: "Notion",
-    tier: "silver",
-    website: "https://notion.so",
-    domain: "notion.so",
-    events: ["3"],
-    emails: ["hello@notion.so"],
-    linkedinUrl: "https://linkedin.com/company/notion",
-    enrichmentStatus: "complete",
-  },
-  {
-    id: "s6",
-    name: "Figma",
-    tier: "silver",
-    website: "https://figma.com",
-    domain: "figma.com",
-    events: ["4", "5"],
-    emails: ["partnerships@figma.com"],
-    linkedinUrl: "https://linkedin.com/company/figma",
-    enrichmentStatus: "complete",
-  },
-];
-
-const generateSampleEmail = (sponsor: EnrichedSponsor, eventName: string): EmailDraft => ({
-  sponsorId: sponsor.id,
-  sponsorName: sponsor.name,
-  subject: `Partnership Opportunity: ${eventName} - ${sponsor.name} Collaboration`,
-  subjectVariations: [
-    `Let's Partner: ${eventName} Sponsorship`,
-    `${sponsor.name} + ${eventName}: A Perfect Match`,
-    `Sponsorship Inquiry for ${eventName}`,
-  ],
-  body: `Dear ${sponsor.name} Events Team,
-
-I hope this message finds you well. I'm reaching out regarding a sponsorship opportunity for ${eventName}.
-
-Having seen ${sponsor.name}'s impressive presence at similar industry events, I believe there's a strong alignment between our audience and your brand's objectives.
-
-Our event offers:
-• Access to 5,000+ qualified attendees
-• Premium brand visibility across all marketing channels
-• Speaking opportunities and workshop sessions
-• Exclusive networking events with industry leaders
-
-I'd love to schedule a brief call to discuss how we can create a mutually beneficial partnership.
-
-Would you be available for a 15-minute call next week?
-
-Best regards,
-[Your Name]
-[Your Title]
-[Contact Information]`,
-  generatedWith: "template",
-});
 
 const initialSteps: WorkflowStep[] = [
   { id: 1, name: "Input", description: "Event details", status: "active" },
@@ -192,14 +44,43 @@ export function useSponsorWorkflow() {
     updateStepStatus(2, "active");
     setCurrentStep(1);
 
-    // Simulate API call with demo data
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { data, error } = await supabase.functions.invoke('event-discovery', {
+        body: {
+          keywords: `${details.name} ${details.industry} ${details.type}`,
+          location: details.location,
+          dateRange: details.startDate && details.endDate ? `${details.startDate} to ${details.endDate}` : undefined,
+        }
+      });
 
-    setDiscoveredEvents(sampleEvents);
-    setSelectedEventIds(sampleEvents.map((e) => e.id));
-    setDataSource("sample");
-    updateStepStatus(2, "complete");
-    setIsLoading(false);
+      if (error) throw error;
+
+      const events: DiscoveredEvent[] = data.events.map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        date: e.date,
+        location: e.location,
+        url: e.url,
+        source: e.source,
+        sponsorCount: e.sponsorCount,
+      }));
+
+      setDiscoveredEvents(events);
+      setSelectedEventIds(events.map((e) => e.id));
+      setDataSource(data.source || 'sample');
+      updateStepStatus(2, "complete");
+      toast.success(`Found ${events.length} events`);
+    } catch (error) {
+      console.error('Event discovery error:', error);
+      toast.error('Failed to discover events. Using demo data.');
+      // Fallback to sample data
+      setDiscoveredEvents(getSampleEvents());
+      setSelectedEventIds(getSampleEvents().map((e) => e.id));
+      setDataSource("sample");
+      updateStepStatus(2, "complete");
+    } finally {
+      setIsLoading(false);
+    }
   }, [updateStepStatus]);
 
   const handleToggleEvent = useCallback((eventId: string) => {
@@ -215,31 +96,106 @@ export function useSponsorWorkflow() {
     updateStepStatus(3, "active");
     setCurrentStep(2);
 
-    // Simulate sponsor identification
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    const filteredSponsors = sampleSponsors.filter((s) =>
-      s.events.some((e) => selectedEventIds.includes(e))
+    const selectedEvents = discoveredEvents.filter((e) =>
+      selectedEventIds.includes(e.id)
     );
-    setSponsors(filteredSponsors);
-    updateStepStatus(3, "complete");
-    setIsLoading(false);
-  }, [selectedEventIds, updateStepStatus]);
+
+    try {
+      // Step 1: Identify sponsors
+      const { data: sponsorData, error: sponsorError } = await supabase.functions.invoke('sponsor-identification', {
+        body: { events: selectedEvents }
+      });
+
+      if (sponsorError) throw sponsorError;
+
+      // Step 2: Enrich contacts
+      const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('contact-enrichment', {
+        body: { sponsors: sponsorData.sponsors }
+      });
+
+      if (enrichError) throw enrichError;
+
+      const enrichedSponsors: EnrichedSponsor[] = enrichedData.sponsors.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        tier: s.tier,
+        website: s.website,
+        domain: s.domain,
+        events: s.eventIds || [],
+        emails: s.emails || [],
+        linkedinUrl: s.linkedinUrl,
+        enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' : 
+                         s.enrichmentStatus === 'partial' ? 'partial' : 'pending',
+      }));
+
+      setSponsors(enrichedSponsors);
+      updateStepStatus(3, "complete");
+      toast.success(`Identified ${enrichedSponsors.length} sponsors`);
+    } catch (error) {
+      console.error('Sponsor identification error:', error);
+      toast.error('Failed to identify sponsors. Using demo data.');
+      setSponsors(getSampleSponsors());
+      updateStepStatus(3, "complete");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedEventIds, discoveredEvents, updateStepStatus]);
 
   const handleGenerateEmails = useCallback(async () => {
     setIsLoading(true);
     updateStepStatus(4, "active");
     setCurrentStep(3);
 
-    // Simulate email generation
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { data, error } = await supabase.functions.invoke('email-generation', {
+        body: {
+          sponsors: sponsors.map(s => ({
+            id: s.id,
+            name: s.name,
+            tier: s.tier,
+            website: s.website,
+            domain: s.domain,
+            emails: s.emails,
+            eventIds: s.events,
+            eventCount: s.events.length,
+          })),
+          eventName: eventDetails?.name || 'Your Event',
+          senderName: 'Your Name',
+          senderOrganization: eventDetails?.name,
+          template: 'partnership',
+        }
+      });
 
-    const generatedEmails = sponsors.map((sponsor) =>
-      generateSampleEmail(sponsor, eventDetails?.name || "Your Event")
-    );
-    setEmails(generatedEmails);
-    updateStepStatus(4, "complete");
-    setIsLoading(false);
+      if (error) throw error;
+
+      const generatedEmails: EmailDraft[] = data.emails.map((e: any) => ({
+        sponsorId: e.sponsorId,
+        sponsorName: e.sponsorName,
+        subject: e.subject,
+        subjectVariations: [],
+        body: e.body,
+        generatedWith: data.usedAI ? 'ai' : 'template',
+      }));
+
+      setEmails(generatedEmails);
+      updateStepStatus(4, "complete");
+      toast.success(`Generated ${generatedEmails.length} email drafts`);
+    } catch (error) {
+      console.error('Email generation error:', error);
+      toast.error('Failed to generate emails. Using templates.');
+      const fallbackEmails = sponsors.map((sponsor) => ({
+        sponsorId: sponsor.id,
+        sponsorName: sponsor.name,
+        subject: `Partnership Opportunity: ${eventDetails?.name} - ${sponsor.name}`,
+        subjectVariations: [],
+        body: generateFallbackEmail(sponsor, eventDetails?.name || 'Your Event'),
+        generatedWith: 'template' as const,
+      }));
+      setEmails(fallbackEmails);
+      updateStepStatus(4, "complete");
+    } finally {
+      setIsLoading(false);
+    }
   }, [sponsors, eventDetails, updateStepStatus]);
 
   const handleProceedToExport = useCallback(() => {
@@ -250,18 +206,47 @@ export function useSponsorWorkflow() {
   const handleExport = useCallback(async (format: ExportFormat) => {
     setExportingFormat(format);
 
-    // Simulate export
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const { data, error } = await supabase.functions.invoke('export-data', {
+        body: {
+          format: format === 'excel' ? 'csv' : format,
+          data: {
+            events: discoveredEvents.filter(e => selectedEventIds.includes(e.id)),
+            sponsors,
+            emails,
+          },
+          eventName: eventDetails?.name,
+        }
+      });
 
-    setCompletedExports((prev) =>
-      prev.includes(format) ? prev : [...prev, format]
-    );
-    setExportingFormat(null);
-    
-    if (!completedExports.includes(format)) {
-      updateStepStatus(5, "complete");
+      if (error) throw error;
+
+      // Download the file
+      const blob = new Blob([data.content], { type: data.contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setCompletedExports((prev) =>
+        prev.includes(format) ? prev : [...prev, format]
+      );
+      toast.success(`Exported ${format.toUpperCase()} file`);
+      
+      if (!completedExports.includes(format)) {
+        updateStepStatus(5, "complete");
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export data');
+    } finally {
+      setExportingFormat(null);
     }
-  }, [completedExports, updateStepStatus]);
+  }, [discoveredEvents, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
 
   const resetWorkflow = useCallback(() => {
     setCurrentStep(0);
@@ -297,4 +282,36 @@ export function useSponsorWorkflow() {
     handleExport,
     resetWorkflow,
   };
+}
+
+// Fallback sample data
+function getSampleEvents(): DiscoveredEvent[] {
+  return [
+    { id: "1", name: "TechCrunch Disrupt 2024", date: "Oct 28-30, 2024", location: "San Francisco, CA", url: "https://techcrunch.com/events/disrupt-2024", source: "sample", sponsorCount: 45 },
+    { id: "2", name: "Web Summit 2024", date: "Nov 11-14, 2024", location: "Lisbon, Portugal", url: "https://websummit.com", source: "sample", sponsorCount: 120 },
+    { id: "3", name: "SaaStr Annual 2024", date: "Sep 10-12, 2024", location: "San Francisco, CA", url: "https://saastr.com/annual", source: "sample", sponsorCount: 85 },
+  ];
+}
+
+function getSampleSponsors(): EnrichedSponsor[] {
+  return [
+    { id: "s1", name: "Stripe", tier: "platinum", website: "https://stripe.com", domain: "stripe.com", events: ["1", "2"], emails: ["partnerships@stripe.com"], linkedinUrl: "https://linkedin.com/company/stripe", enrichmentStatus: "complete" },
+    { id: "s2", name: "Salesforce", tier: "gold", website: "https://salesforce.com", domain: "salesforce.com", events: ["1"], emails: ["sponsorships@salesforce.com"], linkedinUrl: "https://linkedin.com/company/salesforce", enrichmentStatus: "complete" },
+    { id: "s3", name: "HubSpot", tier: "silver", website: "https://hubspot.com", domain: "hubspot.com", events: ["2", "3"], emails: ["events@hubspot.com"], linkedinUrl: "https://linkedin.com/company/hubspot", enrichmentStatus: "complete" },
+  ];
+}
+
+function generateFallbackEmail(sponsor: EnrichedSponsor, eventName: string): string {
+  return `Dear ${sponsor.name} Team,
+
+I hope this message finds you well. I'm reaching out regarding a potential partnership opportunity for ${eventName}.
+
+Having seen ${sponsor.name}'s impressive presence at industry events, I believe there's a strong alignment between our audience and your brand's objectives.
+
+Our event offers premium brand visibility and access to qualified attendees in our industry.
+
+Would you be available for a brief call to discuss further?
+
+Best regards,
+[Your Name]`;
 }
