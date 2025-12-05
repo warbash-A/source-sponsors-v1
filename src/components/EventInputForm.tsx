@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, MapPin, Building2, Tag, Sparkles } from "lucide-react";
+import { MapPin, Building2, Tag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,8 +47,6 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
     type: "",
     industry: "",
     location: "",
-    startDate: "",
-    endDate: "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -64,8 +62,7 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
     formData.name &&
     formData.type &&
     formData.industry &&
-    formData.location &&
-    formData.startDate;
+    formData.location;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
@@ -142,33 +139,6 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="startDate" className="flex items-center gap-2 text-foreground">
-            <Calendar className="h-4 w-4 text-primary" />
-            Start Date
-          </Label>
-          <Input
-            id="startDate"
-            type="date"
-            value={formData.startDate}
-            onChange={(e) => handleChange("startDate", e.target.value)}
-            className="bg-secondary/50 border-border focus:border-primary"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="endDate" className="flex items-center gap-2 text-foreground">
-            <Calendar className="h-4 w-4 text-primary" />
-            End Date (Optional)
-          </Label>
-          <Input
-            id="endDate"
-            type="date"
-            value={formData.endDate}
-            onChange={(e) => handleChange("endDate", e.target.value)}
-            className="bg-secondary/50 border-border focus:border-primary"
-          />
-        </div>
       </div>
 
       <Button
