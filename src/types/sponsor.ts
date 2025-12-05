@@ -3,8 +3,6 @@ export interface EventDetails {
   type: string;
   industry: string;
   location: string;
-  startDate: string;
-  endDate: string;
 }
 
 export interface DiscoveredEvent {

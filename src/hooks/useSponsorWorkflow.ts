@@ -49,7 +49,6 @@ export function useSponsorWorkflow() {
         body: {
           keywords: `${details.name} ${details.industry} ${details.type}`,
           location: details.location,
-          dateRange: details.startDate && details.endDate ? `${details.startDate} to ${details.endDate}` : undefined,
         }
       });
 
