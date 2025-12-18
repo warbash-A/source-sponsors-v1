@@ -101,9 +101,17 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-muted-foreground">
-                        {sponsor.events.length} event{sponsor.events.length !== 1 ? 's' : ''}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        {sponsor.events.length > 0 ? (
+                          sponsor.events.map((event, idx) => (
+                            <span key={idx} className="text-sm text-muted-foreground">
+                              {event}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </td>
                     {showEnrichment && (
                       <>
