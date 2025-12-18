@@ -1,6 +1,14 @@
-import { Building2, Globe, Linkedin, Mail, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Building2, Globe, Linkedin, Mail, Loader2, ArrowUpDown, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { EnrichedSponsor } from "@/types/sponsor";
 
 interface SponsorListProps {
@@ -9,24 +17,126 @@ interface SponsorListProps {
 }
 
 const tierConfig = {
-  platinum: { label: "Platinum", color: "bg-[hsl(45,100%,60%)]/20 text-[hsl(45,100%,70%)] border-[hsl(45,100%,60%)]/30" },
-  gold: { label: "Gold", color: "bg-warning/20 text-warning border-warning/30" },
-  silver: { label: "Silver", color: "bg-muted text-muted-foreground border-border" },
-  bronze: { label: "Bronze", color: "bg-[hsl(25,70%,50%)]/20 text-[hsl(25,70%,60%)] border-[hsl(25,70%,50%)]/30" },
-  unknown: { label: "Sponsor", color: "bg-secondary text-secondary-foreground border-border" },
+  platinum: { label: "Platinum", color: "bg-[hsl(45,100%,60%)]/20 text-[hsl(45,100%,70%)] border-[hsl(45,100%,60%)]/30", order: 1 },
+  gold: { label: "Gold", color: "bg-warning/20 text-warning border-warning/30", order: 2 },
+  silver: { label: "Silver", color: "bg-muted text-muted-foreground border-border", order: 3 },
+  bronze: { label: "Bronze", color: "bg-[hsl(25,70%,50%)]/20 text-[hsl(25,70%,60%)] border-[hsl(25,70%,50%)]/30", order: 4 },
+  unknown: { label: "Sponsor", color: "bg-secondary text-secondary-foreground border-border", order: 5 },
 };
 
+type TierFilter = "all" | keyof typeof tierConfig;
+type StatusFilter = "all" | EnrichedSponsor["enrichmentStatus"];
+type SortOption = "name" | "tier" | "events" | "status";
+
 export function SponsorList({ sponsors, showEnrichment = false }: SponsorListProps) {
+  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("tier");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const filteredAndSortedSponsors = useMemo(() => {
+    let result = [...sponsors];
+
+    // Apply tier filter
+    if (tierFilter !== "all") {
+      result = result.filter((s) => s.tier === tierFilter);
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all" && showEnrichment) {
+      result = result.filter((s) => s.enrichmentStatus === statusFilter);
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "tier":
+          comparison = tierConfig[a.tier].order - tierConfig[b.tier].order;
+          break;
+        case "events":
+          comparison = b.events.length - a.events.length;
+          break;
+        case "status":
+          const statusOrder = { complete: 1, partial: 2, processing: 3, pending: 4, failed: 5 };
+          comparison = statusOrder[a.enrichmentStatus] - statusOrder[b.enrichmentStatus];
+          break;
+      }
+      return sortAsc ? comparison : -comparison;
+    });
+
+    return result;
+  }, [sponsors, tierFilter, statusFilter, sortBy, sortAsc, showEnrichment]);
+
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
             {showEnrichment ? "Enriched Sponsors" : "Identified Sponsors"}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {sponsors.length} unique sponsors across all events
+            {filteredAndSortedSponsors.length} of {sponsors.length} sponsors
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={tierFilter} onValueChange={(v) => setTierFilter(v as TierFilter)}>
+              <SelectTrigger className="w-[120px] h-8 text-xs bg-card border-border">
+                <SelectValue placeholder="Tier" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="all">All Tiers</SelectItem>
+                <SelectItem value="platinum">Platinum</SelectItem>
+                <SelectItem value="gold">Gold</SelectItem>
+                <SelectItem value="silver">Silver</SelectItem>
+                <SelectItem value="bronze">Bronze</SelectItem>
+                <SelectItem value="unknown">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {showEnrichment && (
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="w-[120px] h-8 text-xs bg-card border-border">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
+                <SelectItem value="partial">Partial</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+              <SelectTrigger className="w-[120px] h-8 text-xs bg-card border-border">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="tier">Tier</SelectItem>
+                <SelectItem value="events">Events</SelectItem>
+                {showEnrichment && <SelectItem value="status">Status</SelectItem>}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={() => setSortAsc(!sortAsc)}
+              className="h-8 px-2 rounded border border-border bg-card hover:bg-secondary/50 text-xs text-muted-foreground"
+            >
+              {sortAsc ? "↑" : "↓"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -57,7 +167,7 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {sponsors.map((sponsor, index) => {
+              {filteredAndSortedSponsors.map((sponsor, index) => {
                 const tier = tierConfig[sponsor.tier];
                 
                 return (
