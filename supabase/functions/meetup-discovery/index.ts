@@ -41,7 +41,26 @@ serve(async (req) => {
   }
 
   try {
-    const { keywords, location }: MeetupSearchParams = await req.json();
+    let keywords: string;
+    let location: string | undefined;
+    try {
+      const params: MeetupSearchParams = await req.json();
+      keywords = params.keywords;
+      location = params.location;
+    } catch (err) {
+      console.error('Invalid request body:', err);
+      return new Response(JSON.stringify({ events: [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!keywords?.trim()) {
+      console.log('Empty keywords provided');
+      return new Response(JSON.stringify({ events: [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     console.log('Meetup discovery request:', { keywords, location });
 
     const events: DiscoveredEvent[] = [];
