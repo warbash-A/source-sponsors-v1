@@ -42,6 +42,9 @@ export function useSponsorWorkflow() {
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
     setEventDetails(details);
+    setEventbriteEvents([]);
+    setMeetupEvents([]);
+    setSelectedEventIds([]);
     updateStepStatus(1, "complete");
     updateStepStatus(2, "active");
     setCurrentStep(1);
@@ -54,66 +57,69 @@ export function useSponsorWorkflow() {
 
     const keywords = `${details.name} ${details.industry} ${details.type}`;
 
-    const [ebrResult, meetupResult] = await Promise.allSettled([
-      wantsEventbrite
-        ? supabase.functions.invoke('event-discovery', {
-            body: { keywords, location: details.location },
-          })
-        : Promise.resolve({ data: { events: [] }, error: null }),
-      wantsMeetup
-        ? supabase.functions.invoke('meetup-discovery', {
-            body: { keywords, location: details.location },
-          })
-        : Promise.resolve({ data: { events: [] }, error: null }),
-    ]);
-
-    // --- Eventbrite result ---
-    // Use inline narrowing (not a pre-evaluated boolean) so TypeScript narrows
-    // ebrResult to PromiseFulfilledResult inside the if-block.
-    if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
-      const events: DiscoveredEvent[] = (ebrResult.value.data?.events ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        date: e.date,
-        location: e.location,
-        url: e.url,
-        source: e.source,
-        sponsorCount: e.sponsorCount,
-      }));
-      setEventbriteEvents(events);
-      setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
-    } else if (wantsEventbrite) {
-      // Fallback to sample data for Eventbrite (existing behaviour)
-      const sample = getSampleEvents();
-      setEventbriteEvents(sample);
-      setSelectedEventIds((prev) => [...prev, ...sample.map((e) => e.id)]);
-      toast.error(
+    try {
+      const [ebrResult, meetupResult] = await Promise.allSettled([
+        wantsEventbrite
+          ? supabase.functions.invoke('event-discovery', {
+              body: { keywords, location: details.location },
+            })
+          : Promise.resolve({ data: { events: [] }, error: null }),
         wantsMeetup
-          ? 'Eventbrite search failed — showing Meetup results only'
-          : 'Failed to discover events. Using demo data.'
-      );
-    }
+          ? supabase.functions.invoke('meetup-discovery', {
+              body: { keywords, location: details.location },
+            })
+          : Promise.resolve({ data: { events: [] }, error: null }),
+      ]);
 
-    // --- Meetup result ---
-    // Same pattern: inline narrowing for TypeScript to recognise .value
-    if (meetupResult.status === 'fulfilled' && wantsMeetup) {
-      const events: DiscoveredEvent[] = (meetupResult.value.data?.events ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        date: e.date,
-        location: e.location,
-        url: e.url,
-        source: 'meetup' as const,
-        sponsorCount: e.sponsorCount,
-      }));
-      setMeetupEvents(events);
-      setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
-    } else if (wantsMeetup) {
-      toast.error('Could not reach Meetup — showing Eventbrite results only');
-    }
+      // --- Eventbrite result ---
+      // Use inline narrowing (not a pre-evaluated boolean) so TypeScript narrows
+      // ebrResult to PromiseFulfilledResult inside the if-block.
+      if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
+        const events: DiscoveredEvent[] = (ebrResult.value.data?.events ?? []).map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          date: e.date,
+          location: e.location,
+          url: e.url,
+          source: e.source,
+          sponsorCount: e.sponsorCount,
+        }));
+        setEventbriteEvents(events);
+        setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
+      } else if (wantsEventbrite) {
+        // Fallback to sample data for Eventbrite (existing behaviour)
+        const sample = getSampleEvents();
+        setEventbriteEvents(sample);
+        setSelectedEventIds((prev) => [...prev, ...sample.map((e) => e.id)]);
+        toast.error(
+          wantsMeetup
+            ? 'Eventbrite search failed — showing Meetup results only'
+            : 'Failed to discover events. Using demo data.'
+        );
+      }
 
-    setIsLoadingEventbrite(false);
-    setIsLoadingMeetup(false);
+      // --- Meetup result ---
+      // Same pattern: inline narrowing for TypeScript to recognise .value
+      if (meetupResult.status === 'fulfilled' && wantsMeetup && !meetupResult.value.error) {
+        const events: DiscoveredEvent[] = (meetupResult.value.data?.events ?? []).map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          date: e.date,
+          location: e.location,
+          url: e.url,
+          source: 'meetup' as const,
+          sponsorCount: e.sponsorCount,
+        }));
+        setMeetupEvents(events);
+        setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
+      } else if (wantsMeetup) {
+        setMeetupEvents([]);
+        toast.error('Could not reach Meetup — showing Eventbrite results only');
+      }
+    } finally {
+      setIsLoadingEventbrite(false);
+      setIsLoadingMeetup(false);
+    }
     updateStepStatus(2, "complete");
     toast.success('Discovery complete');
   }, [updateStepStatus]);
