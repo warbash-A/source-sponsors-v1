@@ -22,12 +22,15 @@ export function useSponsorWorkflow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
   const [eventDetails, setEventDetails] = useState<EventDetails | null>(null);
-  const [discoveredEvents, setDiscoveredEvents] = useState<DiscoveredEvent[]>([]);
+  const [eventbriteEvents, setEventbriteEvents] = useState<DiscoveredEvent[]>([]);
+  const [meetupEvents, setMeetupEvents] = useState<DiscoveredEvent[]>([]);
+  const [isLoadingEventbrite, setIsLoadingEventbrite] = useState(false);
+  const [isLoadingMeetup, setIsLoadingMeetup] = useState(false);
+  // Keep a separate isLoading for downstream steps (sponsors, emails, export)
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [sponsors, setSponsors] = useState<EnrichedSponsor[]>([]);
   const [emails, setEmails] = useState<EmailDraft[]>([]);
-  const [dataSource, setDataSource] = useState<'eventbrite' | 'apify' | 'sample'>('sample');
-  const [isLoading, setIsLoading] = useState(false);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [completedExports, setCompletedExports] = useState<ExportFormat[]>([]);
 
@@ -38,23 +41,37 @@ export function useSponsorWorkflow() {
   }, []);
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
-    setIsLoading(true);
     setEventDetails(details);
     updateStepStatus(1, "complete");
     updateStepStatus(2, "active");
     setCurrentStep(1);
 
-    try {
-      const { data, error } = await supabase.functions.invoke('event-discovery', {
-        body: {
-          keywords: `${details.name} ${details.industry} ${details.type}`,
-          location: details.location,
-        }
-      });
+    const wantsEventbrite = details.sources?.includes('eventbrite') ?? true;
+    const wantsMeetup = details.sources?.includes('meetup') ?? false;
 
-      if (error) throw error;
+    if (wantsEventbrite) setIsLoadingEventbrite(true);
+    if (wantsMeetup) setIsLoadingMeetup(true);
 
-      const events: DiscoveredEvent[] = data.events.map((e: any) => ({
+    const keywords = `${details.name} ${details.industry} ${details.type}`;
+
+    const [ebrResult, meetupResult] = await Promise.allSettled([
+      wantsEventbrite
+        ? supabase.functions.invoke('event-discovery', {
+            body: { keywords, location: details.location },
+          })
+        : Promise.resolve({ data: { events: [] }, error: null }),
+      wantsMeetup
+        ? supabase.functions.invoke('meetup-discovery', {
+            body: { keywords, location: details.location },
+          })
+        : Promise.resolve({ data: { events: [] }, error: null }),
+    ]);
+
+    // --- Eventbrite result ---
+    // Use inline narrowing (not a pre-evaluated boolean) so TypeScript narrows
+    // ebrResult to PromiseFulfilledResult inside the if-block.
+    if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
+      const events: DiscoveredEvent[] = (ebrResult.value.data?.events ?? []).map((e: any) => ({
         id: e.id,
         name: e.name,
         date: e.date,
@@ -63,23 +80,42 @@ export function useSponsorWorkflow() {
         source: e.source,
         sponsorCount: e.sponsorCount,
       }));
-
-      setDiscoveredEvents(events);
-      setSelectedEventIds(events.map((e) => e.id));
-      setDataSource(data.source || 'sample');
-      updateStepStatus(2, "complete");
-      toast.success(`Found ${events.length} events`);
-    } catch (error) {
-      console.error('Event discovery error:', error);
-      toast.error('Failed to discover events. Using demo data.');
-      // Fallback to sample data
-      setDiscoveredEvents(getSampleEvents());
-      setSelectedEventIds(getSampleEvents().map((e) => e.id));
-      setDataSource("sample");
-      updateStepStatus(2, "complete");
-    } finally {
-      setIsLoading(false);
+      setEventbriteEvents(events);
+      setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
+    } else if (wantsEventbrite) {
+      // Fallback to sample data for Eventbrite (existing behaviour)
+      const sample = getSampleEvents();
+      setEventbriteEvents(sample);
+      setSelectedEventIds((prev) => [...prev, ...sample.map((e) => e.id)]);
+      toast.error(
+        wantsMeetup
+          ? 'Eventbrite search failed — showing Meetup results only'
+          : 'Failed to discover events. Using demo data.'
+      );
     }
+
+    // --- Meetup result ---
+    // Same pattern: inline narrowing for TypeScript to recognise .value
+    if (meetupResult.status === 'fulfilled' && wantsMeetup) {
+      const events: DiscoveredEvent[] = (meetupResult.value.data?.events ?? []).map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        date: e.date,
+        location: e.location,
+        url: e.url,
+        source: 'meetup' as const,
+        sponsorCount: e.sponsorCount,
+      }));
+      setMeetupEvents(events);
+      setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
+    } else if (wantsMeetup) {
+      toast.error('Could not reach Meetup — showing Eventbrite results only');
+    }
+
+    setIsLoadingEventbrite(false);
+    setIsLoadingMeetup(false);
+    updateStepStatus(2, "complete");
+    toast.success('Discovery complete');
   }, [updateStepStatus]);
 
   const handleToggleEvent = useCallback((eventId: string) => {
@@ -95,7 +131,7 @@ export function useSponsorWorkflow() {
     updateStepStatus(3, "active");
     setCurrentStep(2);
 
-    const selectedEvents = discoveredEvents.filter((e) =>
+    const selectedEvents = [...eventbriteEvents, ...meetupEvents].filter((e) =>
       selectedEventIds.includes(e.id)
     );
 
@@ -138,7 +174,7 @@ export function useSponsorWorkflow() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedEventIds, discoveredEvents, updateStepStatus]);
+  }, [selectedEventIds, eventbriteEvents, meetupEvents, updateStepStatus]);
 
   const handleGenerateEmails = useCallback(async () => {
     setIsLoading(true);
@@ -210,7 +246,7 @@ export function useSponsorWorkflow() {
         body: {
           format: format === 'excel' ? 'csv' : format,
           data: {
-            events: discoveredEvents.filter(e => selectedEventIds.includes(e.id)),
+            events: [...eventbriteEvents, ...meetupEvents].filter(e => selectedEventIds.includes(e.id)),
             sponsors,
             emails,
           },
@@ -245,18 +281,20 @@ export function useSponsorWorkflow() {
     } finally {
       setExportingFormat(null);
     }
-  }, [discoveredEvents, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
+  }, [eventbriteEvents, meetupEvents, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
 
   const resetWorkflow = useCallback(() => {
     setCurrentStep(0);
     setSteps(initialSteps);
     setEventDetails(null);
-    setDiscoveredEvents([]);
+    setEventbriteEvents([]);
+    setMeetupEvents([]);
+    setIsLoadingEventbrite(false);
+    setIsLoadingMeetup(false);
+    setIsLoading(false);
     setSelectedEventIds([]);
     setSponsors([]);
     setEmails([]);
-    setDataSource("sample");
-    setIsLoading(false);
     setExportingFormat(null);
     setCompletedExports([]);
   }, []);
@@ -265,12 +303,14 @@ export function useSponsorWorkflow() {
     currentStep,
     steps,
     eventDetails,
-    discoveredEvents,
+    eventbriteEvents,
+    meetupEvents,
+    isLoadingEventbrite,
+    isLoadingMeetup,
+    isLoading,
     selectedEventIds,
     sponsors,
     emails,
-    dataSource,
-    isLoading,
     exportingFormat,
     completedExports,
     handleEventSubmit,
