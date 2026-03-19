@@ -3,6 +3,7 @@ export interface EventDetails {
   type: string;
   industry: string;
   location: string;
+  sources?: ('eventbrite' | 'meetup')[];
 }
 
 export interface DiscoveredEvent {
@@ -11,7 +12,7 @@ export interface DiscoveredEvent {
   date: string;
   location: string;
   url: string;
-  source: 'eventbrite' | 'apify' | 'sample';
+  source: 'eventbrite' | 'apify' | 'sample' | 'meetup';
   sponsorCount?: number;
 }
 
