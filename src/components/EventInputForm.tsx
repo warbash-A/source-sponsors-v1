@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MapPin, Building2, Tag, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -49,20 +50,31 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
     location: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
-  };
+  const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(['eventbrite', 'meetup']);
 
   const handleChange = (field: keyof EventDetails, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSourceToggle = (source: 'eventbrite' | 'meetup') => {
+    // Prevent unchecking the last source
+    if (sources.length === 1 && sources.includes(source)) return;
+    setSources((prev) =>
+      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
+    );
   };
 
   const isValid =
     formData.name &&
     formData.type &&
     formData.industry &&
-    formData.location;
+    formData.location &&
+    sources.length > 0;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ ...formData, sources });
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
@@ -139,6 +151,34 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
           />
         </div>
 
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-foreground text-sm font-medium">Search Sources</Label>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="source-eventbrite"
+              checked={sources.includes('eventbrite')}
+              onCheckedChange={() => handleSourceToggle('eventbrite')}
+              disabled={sources.length === 1 && sources.includes('eventbrite')}
+            />
+            <Label htmlFor="source-eventbrite" className="text-sm cursor-pointer">
+              Eventbrite
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="source-meetup"
+              checked={sources.includes('meetup')}
+              onCheckedChange={() => handleSourceToggle('meetup')}
+              disabled={sources.length === 1 && sources.includes('meetup')}
+            />
+            <Label htmlFor="source-meetup" className="text-sm cursor-pointer">
+              Meetup
+            </Label>
+          </div>
+        </div>
       </div>
 
       <Button
