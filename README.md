@@ -1,73 +1,73 @@
-# Welcome to your Lovable project
+# SponsorScout
 
-## Project info
+**Event Sponsorship Research Tool** — Discover events, identify sponsors, enrich contacts, generate outreach emails, and export everything.
 
-**URL**: https://lovable.dev/projects/4f44a7f0-04fb-405d-a22a-febddabdddbc
+## Overview
 
-## How can I edit this code?
+SponsorScout is a web application that automates the sponsor research workflow for event organizers and partnership teams. It guides users through a 5-step pipeline to go from event details to ready-to-send outreach emails.
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **Event Discovery** — Input your event details and find similar conferences/events with known sponsors
+- **Sponsor Identification** — Extract and list sponsors from discovered events with tier classification (Platinum, Gold, Silver, Bronze)
+- **Contact Enrichment** — Enrich sponsor data with emails, domains, and LinkedIn profiles
+- **AI Email Generation** — Generate personalized outreach emails using AI or fallback templates
+- **Filtering & Sorting** — Filter sponsors by tier, enrichment status; sort by name, tier, or event count
+- **Export** — Download data as CSV, Excel, or email templates
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/4f44a7f0-04fb-405d-a22a-febddabdddbc) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- **Backend**: Lovable Cloud (Edge Functions)
+- **AI**: Lovable AI Gateway (Google Gemini)
+- **State Management**: React hooks (`useSponsorWorkflow`)
 
-**Use your preferred IDE**
+## Architecture
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```
+src/
+├── pages/Index.tsx              # Main workflow page
+├── components/
+│   ├── EventInputForm.tsx       # Step 1: Event details form
+│   ├── EventDiscoveryResults.tsx # Step 2: Event list with selection
+│   ├── SponsorList.tsx          # Step 3: Sponsor table with filters
+│   ├── EmailPreview.tsx         # Step 4: Generated email previews
+│   ├── ExportPanel.tsx          # Step 5: Export options
+│   ├── WorkflowStepper.tsx      # Progress stepper
+│   └── DataSourceIndicator.tsx  # Live vs sample data indicator
+├── hooks/
+│   └── useSponsorWorkflow.ts    # Core workflow state & logic
+├── types/
+│   └── sponsor.ts               # TypeScript interfaces
+supabase/functions/
+├── event-discovery/             # Find similar events
+├── sponsor-identification/      # Extract sponsors from events
+├── contact-enrichment/          # Enrich sponsor contact data
+├── email-generation/            # AI-powered email drafting
+└── export-data/                 # CSV/Excel export generation
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Workflow
 
-Follow these steps:
+1. **Input** — User enters event name, type, industry, and location
+2. **Discovery** — Backend finds similar events (live API or sample data)
+3. **Sponsors** — Sponsors are extracted and contacts enriched
+4. **Emails** — AI generates personalized partnership outreach emails
+5. **Export** — Download sponsors and emails as CSV, Excel, or templates
+
+## Getting Started
+
+This project runs on [Lovable](https://lovable.dev). Open it in the Lovable editor to develop and preview.
+
+## Local Development
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## License
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/4f44a7f0-04fb-405d-a22a-febddabdddbc) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Private project.
