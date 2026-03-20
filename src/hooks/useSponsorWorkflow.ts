@@ -101,17 +101,19 @@ function deriveSteps(currentStep: number): WorkflowStep[] {
 }
 
 export function useSponsorWorkflow() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
-  const [eventDetails, setEventDetails] = useState<EventDetails | null>(null);
-  const [eventbriteEvents, setEventbriteEvents] = useState<DiscoveredEvent[]>([]);
-  const [meetupEvents, setMeetupEvents] = useState<DiscoveredEvent[]>([]);
+  const stored = readFromStorage();
+
+  const [currentStep, setCurrentStep] = useState<number>(stored.currentStep);
+  const [steps, setSteps] = useState<WorkflowStep[]>(() => deriveSteps(stored.currentStep));
+  const [eventDetails, setEventDetails] = useState<EventDetails | null>(stored.eventDetails);
+  const [eventbriteEvents, setEventbriteEvents] = useState<DiscoveredEvent[]>(stored.eventbriteEvents);
+  const [meetupEvents, setMeetupEvents] = useState<DiscoveredEvent[]>(stored.meetupEvents);
   const [isLoadingEventbrite, setIsLoadingEventbrite] = useState(false);
   const [isLoadingMeetup, setIsLoadingMeetup] = useState(false);
   // Keep a separate isLoading for downstream steps (sponsors, emails, export)
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
-  const [sponsors, setSponsors] = useState<EnrichedSponsor[]>([]);
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>(stored.selectedEventIds);
+  const [sponsors, setSponsors] = useState<EnrichedSponsor[]>(stored.sponsors);
   const [emails, setEmails] = useState<EmailDraft[]>([]);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [completedExports, setCompletedExports] = useState<ExportFormat[]>([]);
