@@ -43,7 +43,11 @@ function readFromStorage(): PersistedWorkflow {
     return {
       // eventDetails may legitimately be null (not yet submitted); the check below
       // falls through to STORAGE_DEFAULTS.eventDetails (also null) in that case.
-      eventDetails: typeof parsed.eventDetails === 'object' && parsed.eventDetails !== null
+      eventDetails: typeof parsed.eventDetails === 'object' && parsed.eventDetails !== null &&
+        typeof parsed.eventDetails.name === 'string' &&
+        typeof parsed.eventDetails.type === 'string' &&
+        typeof parsed.eventDetails.industry === 'string' &&
+        typeof parsed.eventDetails.location === 'string'
         ? parsed.eventDetails as EventDetails
         : STORAGE_DEFAULTS.eventDetails,
       eventbriteEvents: Array.isArray(parsed.eventbriteEvents)
@@ -59,7 +63,7 @@ function readFromStorage(): PersistedWorkflow {
         ? parsed.sponsors
         : STORAGE_DEFAULTS.sponsors,
       currentStep: typeof parsed.currentStep === 'number' && Number.isFinite(parsed.currentStep)
-        ? Math.max(0, Math.min(4, Math.round(parsed.currentStep)))
+        ? Math.max(0, Math.min(initialSteps.length - 1, Math.round(parsed.currentStep)))
         : STORAGE_DEFAULTS.currentStep,
     };
   } catch {
