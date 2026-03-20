@@ -57,8 +57,6 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
   };
 
   const handleSourceToggle = (source: 'eventbrite' | 'meetup') => {
-    // Prevent unchecking the last source
-    if (sources.length === 1 && sources.includes(source)) return;
     setSources((prev) =>
       prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
     );
@@ -161,7 +159,6 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
               id="source-eventbrite"
               checked={sources.includes('eventbrite')}
               onCheckedChange={() => handleSourceToggle('eventbrite')}
-              disabled={sources.length === 1 && sources.includes('eventbrite')}
             />
             <Label htmlFor="source-eventbrite" className="text-sm cursor-pointer">
               Eventbrite
@@ -172,13 +169,15 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
               id="source-meetup"
               checked={sources.includes('meetup')}
               onCheckedChange={() => handleSourceToggle('meetup')}
-              disabled={sources.length === 1 && sources.includes('meetup')}
             />
             <Label htmlFor="source-meetup" className="text-sm cursor-pointer">
               Meetup
             </Label>
           </div>
         </div>
+        {sources.length === 0 && (
+          <p className="text-xs text-muted-foreground">Select at least one source</p>
+        )}
       </div>
 
       <Button

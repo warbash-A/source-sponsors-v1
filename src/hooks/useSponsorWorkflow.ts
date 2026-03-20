@@ -116,12 +116,13 @@ export function useSponsorWorkflow() {
         setMeetupEvents([]);
         toast.error('Could not reach Meetup — showing Eventbrite results only');
       }
+
+      updateStepStatus(2, "complete");
+      toast.success('Discovery complete');
     } finally {
       setIsLoadingEventbrite(false);
       setIsLoadingMeetup(false);
     }
-    updateStepStatus(2, "complete");
-    toast.success('Discovery complete');
   }, [updateStepStatus]);
 
   const handleToggleEvent = useCallback((eventId: string) => {
