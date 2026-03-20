@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type {
@@ -123,6 +123,13 @@ export function useSponsorWorkflow() {
       prev.map((step) => (step.id === stepId ? { ...step, status } : step))
     );
   }, []);
+
+  // Persist workflow state to localStorage on every relevant change.
+  // Single effect (not one per slice) to avoid read-modify-write races
+  // when multiple slices update in the same render cycle (React 18 batching).
+  useEffect(() => {
+    writeToStorage({ eventDetails, eventbriteEvents, meetupEvents, selectedEventIds, sponsors, currentStep });
+  }, [eventDetails, eventbriteEvents, meetupEvents, selectedEventIds, sponsors, currentStep]);
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
     setEventDetails(details);
