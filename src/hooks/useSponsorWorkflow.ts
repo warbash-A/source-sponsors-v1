@@ -10,6 +10,84 @@ import type {
   ExportFormat,
 } from "@/types/sponsor";
 
+// ─── localStorage persistence ────────────────────────────────────────────────
+
+interface PersistedWorkflow {
+  eventDetails: EventDetails | null;
+  eventbriteEvents: DiscoveredEvent[];
+  meetupEvents: DiscoveredEvent[];
+  selectedEventIds: string[];
+  sponsors: EnrichedSponsor[];
+  currentStep: number;
+}
+
+const STORAGE_KEY = 'sponsorscout_workflow';
+
+const STORAGE_DEFAULTS: PersistedWorkflow = {
+  eventDetails: null,
+  eventbriteEvents: [],
+  meetupEvents: [],
+  selectedEventIds: [],
+  sponsors: [],
+  currentStep: 0,
+};
+
+function readFromStorage(): PersistedWorkflow {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return STORAGE_DEFAULTS;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return STORAGE_DEFAULTS;
+    }
+    return {
+      // eventDetails may legitimately be null (not yet submitted); the check below
+      // falls through to STORAGE_DEFAULTS.eventDetails (also null) in that case.
+      eventDetails: typeof parsed.eventDetails === 'object' && parsed.eventDetails !== null
+        ? parsed.eventDetails as EventDetails
+        : STORAGE_DEFAULTS.eventDetails,
+      eventbriteEvents: Array.isArray(parsed.eventbriteEvents)
+        ? parsed.eventbriteEvents
+        : STORAGE_DEFAULTS.eventbriteEvents,
+      meetupEvents: Array.isArray(parsed.meetupEvents)
+        ? parsed.meetupEvents
+        : STORAGE_DEFAULTS.meetupEvents,
+      selectedEventIds: Array.isArray(parsed.selectedEventIds)
+        ? parsed.selectedEventIds
+        : STORAGE_DEFAULTS.selectedEventIds,
+      sponsors: Array.isArray(parsed.sponsors)
+        ? parsed.sponsors
+        : STORAGE_DEFAULTS.sponsors,
+      currentStep: typeof parsed.currentStep === 'number' && Number.isFinite(parsed.currentStep)
+        ? Math.max(0, Math.min(4, Math.round(parsed.currentStep)))
+        : STORAGE_DEFAULTS.currentStep,
+    };
+  } catch {
+    return STORAGE_DEFAULTS;
+  }
+}
+
+function writeToStorage(data: PersistedWorkflow): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Quota exceeded or storage disabled — fail silently
+  }
+}
+
+function deriveSteps(currentStep: number): WorkflowStep[] {
+  return initialSteps.map((s) => ({
+    ...s,
+    status: s.id < currentStep + 1
+      ? 'complete'
+      : s.id === currentStep + 1
+        ? 'active'
+        : 'pending',
+  }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const initialSteps: WorkflowStep[] = [
   { id: 1, name: "Input", description: "Event details", status: "active" },
   { id: 2, name: "Discovery", description: "Find events", status: "pending" },
