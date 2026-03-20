@@ -75,6 +75,16 @@ function writeToStorage(data: PersistedWorkflow): void {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
+const initialSteps: WorkflowStep[] = [
+  { id: 1, name: "Input", description: "Event details", status: "active" },
+  { id: 2, name: "Discovery", description: "Find events", status: "pending" },
+  { id: 3, name: "Sponsors", description: "Identify sponsors", status: "pending" },
+  { id: 4, name: "Emails", description: "Generate outreach", status: "pending" },
+  { id: 5, name: "Export", description: "Download data", status: "pending" },
+];
+
 function deriveSteps(currentStep: number): WorkflowStep[] {
   return initialSteps.map((s) => ({
     ...s,
@@ -85,16 +95,6 @@ function deriveSteps(currentStep: number): WorkflowStep[] {
         : 'pending',
   }));
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-const initialSteps: WorkflowStep[] = [
-  { id: 1, name: "Input", description: "Event details", status: "active" },
-  { id: 2, name: "Discovery", description: "Find events", status: "pending" },
-  { id: 3, name: "Sponsors", description: "Identify sponsors", status: "pending" },
-  { id: 4, name: "Emails", description: "Generate outreach", status: "pending" },
-  { id: 5, name: "Export", description: "Download data", status: "pending" },
-];
 
 export function useSponsorWorkflow() {
   const [currentStep, setCurrentStep] = useState(0);
