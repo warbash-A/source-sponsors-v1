@@ -6,19 +6,21 @@ import { EventDiscoveryResults } from "@/components/EventDiscoveryResults";
 import { SponsorList } from "@/components/SponsorList";
 import { EmailPreview } from "@/components/EmailPreview";
 import { ExportPanel } from "@/components/ExportPanel";
-import { DataSourceIndicator } from "@/components/DataSourceIndicator";
 import { useSponsorWorkflow } from "@/hooks/useSponsorWorkflow";
 
 const Index = () => {
   const {
     currentStep,
     steps,
-    discoveredEvents,
+    eventbriteEvents,
+    meetupEvents,
+    isLoadingEventbrite,
+    isLoadingMeetup,
+    isLoading,
+    eventDetails,
     selectedEventIds,
     sponsors,
     emails,
-    dataSource,
-    isLoading,
     exportingFormat,
     completedExports,
     handleEventSubmit,
@@ -79,32 +81,28 @@ const Index = () => {
                   Tell us about your event to find similar conferences and their sponsors
                 </p>
               </div>
-              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoading} />
+              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEventbrite || isLoadingMeetup} />
             </div>
           )}
 
           {/* Step 2: Event Discovery */}
           {currentStep === 1 && (
             <div className="space-y-6">
-              <DataSourceIndicator
-                source={dataSource}
-                fallbackReason={
-                  dataSource === "sample"
-                    ? "Using demo data. Connect API keys for live data."
-                    : undefined
-                }
-              />
               <div className="rounded-xl border border-border bg-card p-6 shadow-card">
                 <EventDiscoveryResults
-                  events={discoveredEvents}
+                  eventbriteEvents={eventbriteEvents}
+                  meetupEvents={meetupEvents}
                   selectedEvents={selectedEventIds}
                   onToggleEvent={handleToggleEvent}
-                  dataSource={dataSource}
+                  isLoadingEventbrite={isLoadingEventbrite}
+                  isLoadingMeetup={isLoadingMeetup}
+                  showEventbrite={eventDetails?.sources?.includes('eventbrite') ?? true}
+                  showMeetup={eventDetails?.sources?.includes('meetup') ?? false}
                 />
                 <div className="mt-6 flex justify-end">
                   <Button
                     onClick={handleProceedToSponsors}
-                    disabled={selectedEventIds.length === 0 || isLoading}
+                    disabled={selectedEventIds.length === 0 || isLoadingEventbrite || isLoadingMeetup || isLoading}
                     variant="gradient"
                   >
                     {isLoading ? (
