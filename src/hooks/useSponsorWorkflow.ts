@@ -382,6 +382,7 @@ export function useSponsorWorkflow() {
   }, [eventbriteEvents, meetupEvents, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
 
   const resetWorkflow = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
     setCurrentStep(0);
     setSteps(initialSteps);
     setEventDetails(null);
