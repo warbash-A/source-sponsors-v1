@@ -43,10 +43,12 @@ serve(async (req) => {
   try {
     let keywords: string;
     let location: string | undefined;
+    let eventCount = 10;
     try {
-      const params: MeetupSearchParams = await req.json();
+      const params: MeetupSearchParams & { eventCount?: number } = await req.json();
       keywords = params.keywords;
       location = params.location;
+      eventCount = typeof params.eventCount === 'number' ? params.eventCount : 10;
     } catch (err) {
       console.error('Invalid request body:', err);
       return new Response(JSON.stringify({ events: [] }), {
@@ -91,7 +93,7 @@ serve(async (req) => {
     console.log('Found Meetup event URLs:', meetupUrls.length);
 
     // Fetch each event page and filter to only those with explicit sponsor info
-    for (const { url, name } of meetupUrls.slice(0, 10)) {
+    for (const { url, name } of meetupUrls.slice(0, eventCount)) {
       try {
         const eventResponse = await fetch(`https://r.jina.ai/${url}`, {
           headers: { 'Accept': 'text/plain' },

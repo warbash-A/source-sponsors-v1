@@ -50,7 +50,7 @@ serve(async (req) => {
   }
 
   try {
-    const { keywords, location, dateRange }: EventSearchParams = await req.json();
+    const { keywords, location, dateRange, eventCount = 10 }: EventSearchParams & { eventCount?: number } = await req.json();
     console.log('Event discovery request:', { keywords, location, dateRange });
 
     const events: DiscoveredEvent[] = [];
@@ -76,7 +76,7 @@ serve(async (req) => {
         console.log('Content preview:', content.substring(0, 500));
         
         // Parse events from the markdown content
-        const parsedEvents = parseEventsFromMarkdown(content, keywords);
+        const parsedEvents = parseEventsFromMarkdown(content, keywords, eventCount);
         events.push(...parsedEvents);
         console.log('Parsed events from Eventbrite:', parsedEvents.length);
       } else {
@@ -97,7 +97,7 @@ serve(async (req) => {
         
         if (jinaResponse.ok) {
           const content = await jinaResponse.text();
-          const parsedEvents = parseEventsFromGenericSearch(content, keywords, events.map(e => e.url));
+          const parsedEvents = parseEventsFromGenericSearch(content, keywords, events.map(e => e.url), eventCount);
           events.push(...parsedEvents);
           console.log('Parsed events from generic search:', parsedEvents.length);
         }
@@ -113,7 +113,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ 
-      events: events.slice(0, 10), // Limit to 10 events
+      events: events.slice(0, eventCount),
       source: events[0]?.source || 'sample',
       totalFound: events.length 
     }), {
@@ -128,7 +128,7 @@ serve(async (req) => {
   }
 });
 
-function parseEventsFromMarkdown(content: string, keywords: string): DiscoveredEvent[] {
+function parseEventsFromMarkdown(content: string, keywords: string, eventCount: number): DiscoveredEvent[] {
   const events: DiscoveredEvent[] = [];
   const seenUrls = new Set<string>();
   const seenNames = new Set<string>();
@@ -172,9 +172,9 @@ function parseEventsFromMarkdown(content: string, keywords: string): DiscoveredE
       source: 'eventbrite',
     });
     
-    if (events.length >= 10) break;
+    if (events.length >= eventCount) break;
   }
-  
+
   // Strategy 2: Look for markdown links with event-like titles
   const linkPattern = /\[([^\]]{10,100})\]\((https?:\/\/[^\)]+)\)/g;
   const linkMatches = content.matchAll(linkPattern);
@@ -208,13 +208,13 @@ function parseEventsFromMarkdown(content: string, keywords: string): DiscoveredE
       source: 'eventbrite',
     });
     
-    if (events.length >= 10) break;
+    if (events.length >= eventCount) break;
   }
-  
+
   return events;
 }
 
-function parseEventsFromGenericSearch(content: string, keywords: string, existingUrls: string[]): DiscoveredEvent[] {
+function parseEventsFromGenericSearch(content: string, keywords: string, existingUrls: string[], eventCount: number): DiscoveredEvent[] {
   const events: DiscoveredEvent[] = [];
   const seenUrls = new Set<string>(existingUrls);
   const seenNames = new Set<string>();
@@ -266,7 +266,7 @@ function parseEventsFromGenericSearch(content: string, keywords: string, existin
       source: 'web',
     });
     
-    if (events.length >= 5) break;
+    if (events.length >= eventCount) break;
   }
   
   return events;
