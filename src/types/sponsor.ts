@@ -4,6 +4,7 @@ export interface EventDetails {
   industry: string;
   location: string;
   sources?: ('eventbrite' | 'meetup')[];
+  eventCount?: number;
 }
 
 export interface DiscoveredEvent {
