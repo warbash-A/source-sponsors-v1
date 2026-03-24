@@ -42,7 +42,7 @@ serve(async (req) => {
     const { sponsors, eventName, senderName, senderOrganization, template = 'partnership' }: EmailRequest = await req.json();
     console.log('Email generation for sponsors:', sponsors.length);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     const emails: EmailDraft[] = [];
 
     for (const sponsor of sponsors) {
@@ -53,52 +53,38 @@ serve(async (req) => {
       let emailBody: string;
       let subject: string;
 
-      if (LOVABLE_API_KEY) {
+      if (ANTHROPIC_API_KEY) {
         try {
-          // Use Lovable AI to generate personalized email
           const prompt = buildEmailPrompt(sponsor, eventName, senderName, senderOrganization, template);
-          
-          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+
+          const response = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
+              "x-api-key": ANTHROPIC_API_KEY,
+              "anthropic-version": "2023-06-01",
+              "content-type": "application/json",
             },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
-              messages: [
-                { 
-                  role: "system", 
-                  content: "You are an expert at writing professional, personalized business outreach emails. Write concise, compelling emails that feel genuine and not generic. Keep emails under 200 words." 
-                },
-                { role: "user", content: prompt }
-              ],
+              model: "claude-haiku-4-5-20251001",
+              max_tokens: 500,
+              system: "You are an expert at writing professional, personalized business outreach emails. Write concise, compelling emails that feel genuine and not generic. Keep emails under 200 words.",
+              messages: [{ role: "user", content: prompt }],
             }),
           });
 
           if (response.ok) {
             const data = await response.json();
-            const generatedContent = data.choices[0]?.message?.content || '';
-            
-            // Parse subject and body from response
+            const generatedContent = data.content[0]?.text || '';
             const parsed = parseEmailContent(generatedContent);
             subject = parsed.subject || generateSubject(sponsor, eventName, template);
             emailBody = parsed.body || generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
           } else {
-            const errorStatus = response.status;
-            console.log('AI generation failed with status:', errorStatus);
-            
-            if (errorStatus === 429) {
-              console.log('Rate limited, using template');
-            } else if (errorStatus === 402) {
-              console.log('Payment required, using template');
-            }
-            
+            console.log('Anthropic API failed with status:', response.status);
             subject = generateSubject(sponsor, eventName, template);
             emailBody = generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
           }
         } catch (error) {
-          console.error('AI generation error:', error);
+          console.error('Anthropic generation error:', error);
           subject = generateSubject(sponsor, eventName, template);
           emailBody = generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
         }
@@ -116,17 +102,12 @@ serve(async (req) => {
         body: emailBody,
         status: 'generated',
       });
-
-      // Small delay between AI calls
-      if (LOVABLE_API_KEY) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
     }
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       emails,
       totalGenerated: emails.length,
-      usedAI: !!LOVABLE_API_KEY,
+      usedAI: !!ANTHROPIC_API_KEY,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
