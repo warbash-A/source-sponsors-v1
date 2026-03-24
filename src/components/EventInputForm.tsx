@@ -24,6 +24,7 @@ const eventTypes = [
   "Summit",
   "Expo",
   "Workshop",
+  "Meetup",
   "Networking Event",
   "Hackathon",
   "Awards Ceremony",
@@ -51,6 +52,7 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
   });
 
   const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(['eventbrite', 'meetup']);
+  const [eventCount, setEventCount] = useState<number>(10);
 
   const handleChange = (field: keyof EventDetails, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -71,7 +73,7 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ ...formData, sources });
+    onSubmit({ ...formData, sources, eventCount });
   };
 
   return (
@@ -178,6 +180,23 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
         {sources.length === 0 && (
           <p className="text-xs text-muted-foreground">Select at least one source</p>
         )}
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-foreground text-sm font-medium">Number of events</Label>
+        <div className="flex items-center gap-2">
+          {[5, 10, 25, 50].map((count) => (
+            <Button
+              key={count}
+              type="button"
+              variant={eventCount === count ? "default" : "outline"}
+              size="sm"
+              onClick={() => setEventCount(count)}
+            >
+              {count}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <Button
