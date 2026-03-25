@@ -176,12 +176,12 @@ export function useSponsorWorkflow() {
           sponsorCount: e.sponsorCount,
         }));
         setEventbriteEvents(events);
-        setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
+        // Events are NOT auto-selected - user must manually select
       } else if (wantsEventbrite) {
         // Fallback to sample data for Eventbrite (existing behaviour)
         const sample = getSampleEvents();
         setEventbriteEvents(sample);
-        setSelectedEventIds((prev) => [...prev, ...sample.map((e) => e.id)]);
+        // Events are NOT auto-selected - user must manually select
         toast.error(
           wantsMeetup
             ? 'Eventbrite search failed — showing Meetup results only'
@@ -202,7 +202,7 @@ export function useSponsorWorkflow() {
           sponsorCount: e.sponsorCount,
         }));
         setMeetupEvents(events);
-        setSelectedEventIds((prev) => [...prev, ...events.map((e) => e.id)]);
+        // Events are NOT auto-selected - user must manually select
       } else if (wantsMeetup) {
         setMeetupEvents([]);
         toast.error('Could not reach Meetup — showing Eventbrite results only');

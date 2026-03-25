@@ -97,10 +97,10 @@ function EventSection({
                         {event.location}
                       </span>
                       {event.sponsorCount !== undefined && (
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5" />
+                        <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                          <Users className="h-3.5 w-3.5 mr-1" />
                           {event.sponsorCount} sponsors
-                        </span>
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -142,9 +142,14 @@ export function EventDiscoveryResults({
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <p className="text-sm text-muted-foreground">
-        {totalCount} similar events found
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {totalCount} similar events found
+        </p>
+        <p className="text-sm font-medium text-foreground">
+          {selectedEvents.length} selected
+        </p>
+      </div>
       {showEventbrite && (
         <EventSection
           title="Eventbrite Events"
