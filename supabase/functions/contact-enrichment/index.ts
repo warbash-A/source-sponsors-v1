@@ -1,9 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders, json, readPage } from "../_shared/scrape.ts";
 
 interface Sponsor {
   id: string;
@@ -11,23 +7,27 @@ interface Sponsor {
   tier: string;
   website?: string;
   eventIds: string[];
+  eventNames?: string[];
   eventCount: number;
+  sourceUrl?: string;
+}
+
+interface EmailRecord {
+  email: string;
+  /** true = published on the company's own site; false = pattern guess */
+  verified: boolean;
+  sourceUrl?: string;
 }
 
 interface EnrichedSponsor extends Sponsor {
   domain?: string;
   emails: string[];
+  emailDetails: EmailRecord[];
   linkedinUrl?: string;
-  enrichmentStatus: 'pending' | 'enriched' | 'partial' | 'failed';
-  contacts?: Contact[];
+  enrichmentStatus: 'enriched' | 'partial' | 'failed';
 }
 
-interface Contact {
-  name?: string;
-  title?: string;
-  email?: string;
-  linkedin?: string;
-}
+const GUESS_PREFIXES = ['partnerships', 'sponsorship', 'info', 'contact', 'hello'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,192 +35,107 @@ serve(async (req) => {
   }
 
   try {
-    const { sponsors }: { sponsors: Sponsor[] } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const sponsors: Sponsor[] = Array.isArray(body.sponsors) ? body.sponsors : [];
     console.log('Contact enrichment for sponsors:', sponsors.length);
 
     const enrichedSponsors: EnrichedSponsor[] = [];
 
     for (const sponsor of sponsors) {
-      console.log('Enriching sponsor:', sponsor.name);
-      
       const enriched: EnrichedSponsor = {
         ...sponsor,
         emails: [],
-        enrichmentStatus: 'pending',
-        contacts: [],
+        emailDetails: [],
+        enrichmentStatus: 'failed',
       };
 
       try {
-        // Extract/infer domain
-        const domain = sponsor.website || inferDomain(sponsor.name);
+        const domain = extractDomain(sponsor.website);
         enriched.domain = domain;
 
         if (domain) {
-          // Try to scrape company website for contact info
-          const companyUrl = domain.startsWith('http') ? domain : `https://${domain}`;
-          
-          try {
-            // Scrape about/contact page
-            const contactPageUrls = [
-              `${companyUrl}/contact`,
-              `${companyUrl}/about`,
-              `${companyUrl}/team`,
-              `${companyUrl}/about-us`,
-            ];
+          const base = `https://${domain}`;
+          const candidates = [
+            `${base}/contact`,
+            `${base}/partnerships`,
+            `${base}/about`,
+            base,
+          ];
 
-            for (const pageUrl of contactPageUrls) {
-              try {
-                const jinaResponse = await fetch(`https://r.jina.ai/${pageUrl}`, {
-                  headers: { 'Accept': 'text/plain' },
-                });
+          for (const pageUrl of candidates) {
+            const content = await readPage(pageUrl, 20000);
+            if (!content) continue;
 
-                if (jinaResponse.ok) {
-                  const content = await jinaResponse.text();
-                  
-                  // Extract emails
-                  const emails = extractEmails(content);
-                  enriched.emails.push(...emails.filter(e => !enriched.emails.includes(e)));
-                  
-                  // Extract contacts/team members
-                  const contacts = extractContacts(content);
-                  enriched.contacts?.push(...contacts);
-                  
-                  // Extract LinkedIn URL
-                  if (!enriched.linkedinUrl) {
-                    enriched.linkedinUrl = extractLinkedIn(content, sponsor.name);
-                  }
-                  
-                  if (enriched.emails.length > 0 || enriched.contacts!.length > 0) {
-                    break; // Found good data, stop trying other pages
-                  }
-                }
-              } catch (e) {
-                // Continue to next URL
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 300));
+            for (const email of extractEmails(content, domain)) {
+              if (enriched.emailDetails.some((e) => e.email === email)) continue;
+              enriched.emailDetails.push({ email, verified: true, sourceUrl: pageUrl });
             }
-          } catch (error) {
-            console.error('Error scraping company website:', error);
+
+            if (!enriched.linkedinUrl) {
+              const found = content.match(/https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/company\/[A-Za-z0-9._-]+/i);
+              if (found) enriched.linkedinUrl = found[0];
+            }
+
+            if (enriched.emailDetails.length > 0) break;
+            await new Promise((r) => setTimeout(r, 200));
           }
 
-          // Generate email variants if no emails found
-          if (enriched.emails.length === 0 && domain) {
-            enriched.emails = generateEmailVariants(domain);
-          }
-
-          // Generate LinkedIn search URL if not found
-          if (!enriched.linkedinUrl) {
-            enriched.linkedinUrl = `https://www.linkedin.com/company/${sponsor.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
+          // Only if nothing real was published, offer clearly-labelled guesses.
+          if (enriched.emailDetails.length === 0) {
+            for (const prefix of GUESS_PREFIXES.slice(0, 3)) {
+              enriched.emailDetails.push({ email: `${prefix}@${domain}`, verified: false });
+            }
           }
         }
 
-        // Set enrichment status
-        if (enriched.emails.length > 0 && enriched.contacts!.length > 0) {
-          enriched.enrichmentStatus = 'enriched';
-        } else if (enriched.emails.length > 0 || enriched.contacts!.length > 0) {
-          enriched.enrichmentStatus = 'partial';
-        } else {
-          enriched.enrichmentStatus = 'partial'; // At least have generated emails
-        }
+        enriched.emails = enriched.emailDetails.map((e) => e.email);
 
+        const hasVerified = enriched.emailDetails.some((e) => e.verified);
+        enriched.enrichmentStatus = hasVerified
+          ? 'enriched'
+          : enriched.emailDetails.length > 0
+            ? 'partial'
+            : 'failed';
       } catch (error) {
         console.error('Error enriching sponsor:', sponsor.name, error);
         enriched.enrichmentStatus = 'failed';
       }
 
       enrichedSponsors.push(enriched);
-      
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((r) => setTimeout(r, 200));
     }
 
-    return new Response(JSON.stringify({ 
+    return json({
       sponsors: enrichedSponsors,
-      totalEnriched: enrichedSponsors.filter(s => s.enrichmentStatus === 'enriched').length,
-      totalPartial: enrichedSponsors.filter(s => s.enrichmentStatus === 'partial').length,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      totalEnriched: enrichedSponsors.filter((s) => s.enrichmentStatus === 'enriched').length,
+      totalPartial: enrichedSponsors.filter((s) => s.enrichmentStatus === 'partial').length,
+      totalFailed: enrichedSponsors.filter((s) => s.enrichmentStatus === 'failed').length,
     });
   } catch (error) {
     console.error('Error in contact-enrichment:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 });
 
-function inferDomain(companyName: string): string {
-  // Simple domain inference from company name
-  const cleaned = companyName
-    .toLowerCase()
-    .replace(/\s+(inc|llc|ltd|corp|corporation|company|co)\.?$/i, '')
-    .replace(/[^a-z0-9]/g, '');
-  
-  return `${cleaned}.com`;
+/** Only uses a real website; never invents a domain from the company name. */
+function extractDomain(website?: string): string | undefined {
+  if (!website) return undefined;
+  try {
+    const url = website.startsWith('http') ? website : `https://${website}`;
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return undefined;
+  }
 }
 
-function extractEmails(content: string): string[] {
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-  const matches = content.match(emailRegex) || [];
-  
-  // Filter out common non-contact emails
-  const filtered = matches.filter(email => {
+function extractEmails(content: string, domain: string): string[] {
+  const matches = content.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g) || [];
+  const filtered = matches.filter((email) => {
     const lower = email.toLowerCase();
-    return !lower.includes('example') && 
-           !lower.includes('test@') &&
-           !lower.includes('noreply') &&
-           !lower.includes('no-reply');
+    if (!lower.endsWith(`@${domain}`) && !lower.endsWith(`.${domain}`)) return false;
+    return !['example', 'test@', 'noreply', 'no-reply', 'sentry', 'wixpress', '.png', '.jpg'].some((bad) =>
+      lower.includes(bad),
+    );
   });
-  
   return [...new Set(filtered)].slice(0, 5);
-}
-
-function extractContacts(content: string): Contact[] {
-  const contacts: Contact[] = [];
-  
-  // Look for patterns like "Name - Title" or "Name, Title"
-  const patterns = [
-    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[-–|,]\s*(CEO|CTO|CMO|CFO|VP|Director|Manager|Head|Chief|President|Founder|Co-Founder)[^,\n]*/gi,
-    /(?:contact|reach|email)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/gi,
-  ];
-  
-  for (const pattern of patterns) {
-    const matches = content.matchAll(pattern);
-    for (const match of matches) {
-      const name = match[1]?.trim();
-      const title = match[2]?.trim();
-      
-      if (name && name.length < 50) {
-        contacts.push({ name, title });
-      }
-      
-      if (contacts.length >= 5) break;
-    }
-  }
-  
-  return contacts;
-}
-
-function extractLinkedIn(content: string, companyName: string): string | undefined {
-  // Look for LinkedIn company URL
-  const linkedinMatch = content.match(/https?:\/\/(?:www\.)?linkedin\.com\/company\/([a-z0-9-]+)/i);
-  if (linkedinMatch) {
-    return linkedinMatch[0];
-  }
-  return undefined;
-}
-
-function generateEmailVariants(domain: string): string[] {
-  const cleanDomain = domain.replace(/^www\./, '');
-  
-  // Common email patterns for outreach
-  return [
-    `info@${cleanDomain}`,
-    `contact@${cleanDomain}`,
-    `hello@${cleanDomain}`,
-    `partnerships@${cleanDomain}`,
-    `marketing@${cleanDomain}`,
-  ];
 }
