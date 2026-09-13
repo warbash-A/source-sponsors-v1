@@ -5,11 +5,14 @@ import type { WorkflowStep } from "@/types/sponsor";
 interface WorkflowStepperProps {
   steps: WorkflowStep[];
   currentStep: number;
+  maxStepReached?: number;
+  onStepClick?: (step: number) => void;
 }
 
 const stepIcons = [Search, Globe, Users, Mail, FileDown];
 
-export function WorkflowStepper({ steps, currentStep }: WorkflowStepperProps) {
+export function WorkflowStepper({ steps, currentStep, maxStepReached = currentStep, onStepClick }: WorkflowStepperProps) {
+
   return (
     <div className="w-full py-6">
       <div className="relative flex items-center justify-between">
