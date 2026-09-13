@@ -1,39 +1,46 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, json, generateId, readPage } from "../_shared/scrape.ts";
+import { aiExtract, AiGatewayError } from "../_shared/ai-extract.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface MeetupSearchParams {
-  keywords: string;
-  location?: string;
-}
-
-// Local type — only 'meetup' is valid here
 interface DiscoveredEvent {
   id: string;
   name: string;
   url: string;
   date: string;
   location: string;
-  sponsorCount?: number;
   source: 'meetup';
 }
 
-const SPONSOR_INDICATORS = [
-  'sponsored by',
-  'our sponsors',
-  'thank our sponsors',
-  'gold sponsor',
-  'silver sponsor',
-  'bronze sponsor',
-  'platinum sponsor',
-  'presenting sponsor',
-  'title sponsor',
-  'sponsors & partners',
-  'sponsors:',
-];
+interface ExtractedEvents {
+  events: {
+    name: string;
+    url: string;
+    date: string;
+    location: string;
+  }[];
+}
+
+const EVENTS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['events'],
+  properties: {
+    events: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'url', 'date', 'location'],
+        properties: {
+          name: { type: 'string' },
+          url: { type: 'string' },
+          date: { type: 'string' },
+          location: { type: 'string' },
+        },
+      },
+    },
+  },
+} as const;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,144 +48,90 @@ serve(async (req) => {
   }
 
   try {
-    let keywords: string;
-    let location: string | undefined;
-    let eventCount = 10;
-    try {
-      const params: MeetupSearchParams & { eventCount?: number } = await req.json();
-      keywords = params.keywords;
-      location = params.location;
-      eventCount = typeof params.eventCount === 'number' ? params.eventCount : 10;
-    } catch (err) {
-      console.error('Invalid request body:', err);
-      return new Response(JSON.stringify({ events: [] }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const body = await req.json().catch(() => ({}));
+    const keywords: string = (body.keywords ?? '').toString().trim();
+    const location: string | undefined = body.location?.toString().trim() || undefined;
+    const eventCount: number = typeof body.eventCount === 'number' ? Math.min(body.eventCount, 50) : 10;
+
+    if (!keywords) {
+      return json({ events: [], status: 'empty', message: 'No search keywords provided.' });
     }
 
-    if (!keywords?.trim()) {
-      console.log('Empty keywords provided');
-      return new Response(JSON.stringify({ events: [] }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('Meetup discovery request:', { keywords, location });
-
-    const events: DiscoveredEvent[] = [];
-
-    const searchQuery = encodeURIComponent(keywords.trim());
-    const locationQuery = location ? encodeURIComponent(location) : '';
-    const meetupSearchUrl = locationQuery
-      ? `https://www.meetup.com/find/?keywords=${searchQuery}&location=${locationQuery}&source=EVENTS`
+    const searchQuery = encodeURIComponent(keywords);
+    const searchUrl = location
+      ? `https://www.meetup.com/find/?keywords=${searchQuery}&location=${encodeURIComponent(location)}&source=EVENTS`
       : `https://www.meetup.com/find/?keywords=${searchQuery}&source=EVENTS`;
 
-    console.log('Fetching Meetup search via JinaAI:', meetupSearchUrl);
+    console.log('Reading Meetup search:', searchUrl);
+    const content = await readPage(searchUrl, 40000);
 
-    const jinaResponse = await fetch(`https://r.jina.ai/${meetupSearchUrl}`, {
-      headers: { 'Accept': 'text/plain' },
-    });
-
-    if (!jinaResponse.ok) {
-      console.log('JinaAI request failed:', jinaResponse.status);
-      return new Response(JSON.stringify({ events: [] }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    if (!content) {
+      return json({
+        events: [],
+        status: 'error',
+        message: 'Meetup could not be read right now. Try again in a moment.',
       });
     }
 
-    const content = await jinaResponse.text();
-    console.log('JinaAI response length:', content.length);
-
-    const meetupUrls = extractMeetupEventUrls(content);
-    console.log('Found Meetup event URLs:', meetupUrls.length);
-
-    // Fetch each event page and filter to only those with explicit sponsor info
-    for (const { url, name } of meetupUrls.slice(0, eventCount)) {
-      try {
-        const eventResponse = await fetch(`https://r.jina.ai/${url}`, {
-          headers: { 'Accept': 'text/plain' },
-        });
-        if (!eventResponse.ok) continue;
-
-        const eventContent = await eventResponse.text();
-        if (!hasSponsorInfo(eventContent)) continue;
-
-        const snippet = eventContent.substring(0, 1000);
-        const date = extractDateFromContext(snippet);
-        const loc = extractLocationFromContext(snippet);
-
-        events.push({
-          id: generateId(),
-          name,
-          url,
-          date: date || 'TBD',
-          location: loc || location || 'See event page',
-          source: 'meetup',
-        });
-      } catch (err) {
-        console.error('Error fetching event page:', url, err);
+    let extracted: ExtractedEvents;
+    try {
+      extracted = await aiExtract<ExtractedEvents>({
+        name: 'meetup_events',
+        schema: EVENTS_SCHEMA as unknown as Record<string, unknown>,
+        instructions: [
+          'You extract real events from the markdown of a Meetup search results page.',
+          `Return at most ${eventCount} events that genuinely match the search topic: "${keywords}".`,
+          'For each event give: name (the event title), url (the full meetup.com event link), date (as shown, e.g. "Wed, Sep 23 · 6:00 PM PDT"), location (city or venue, or "Online").',
+          'Ignore navigation links, group pages without events, adverts, cookie notices and photo captions.',
+          'If a field is not present on the page, use an empty string. Never invent an event or a URL.',
+          'If there are no genuine matching events, return an empty list.',
+        ].join(' '),
+        content,
+      });
+    } catch (err) {
+      if (err instanceof AiGatewayError) {
+        const message =
+          err.status === 402
+            ? 'AI credits are exhausted, so Meetup results could not be read.'
+            : err.status === 429
+              ? 'Too many requests right now. Please retry in a moment.'
+              : 'Could not read the Meetup results.';
+        return json({ events: [], status: 'error', message });
       }
+      throw err;
     }
 
-    console.log('Meetup events with sponsors found:', events.length);
+    const seen = new Set<string>();
+    const events: DiscoveredEvent[] = [];
+    for (const e of extracted.events ?? []) {
+      const url = (e.url ?? '').trim();
+      const name = (e.name ?? '').trim();
+      if (!name || !url.includes('meetup.com') || seen.has(url)) continue;
+      seen.add(url);
+      events.push({
+        id: generateId(),
+        name,
+        url,
+        date: e.date?.trim() || 'TBD',
+        location: e.location?.trim() || location || 'See event page',
+        source: 'meetup',
+      });
+      if (events.length >= eventCount) break;
+    }
 
-    return new Response(JSON.stringify({ events }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.log('Meetup events extracted:', events.length);
+
+    return json({
+      events,
+      status: events.length > 0 ? 'ok' : 'no_results',
+      message: events.length === 0 ? 'Meetup returned no matching events.' : undefined,
     });
   } catch (error) {
     console.error('Error in meetup-discovery:', error);
-    // Always return empty array — no sample data fallback for Meetup
-    return new Response(JSON.stringify({ events: [] }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return json({
+      events: [],
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
-
-/** Returns true if content contains explicit sponsor mentions */
-export function hasSponsorInfo(content: string): boolean {
-  const lower = content.toLowerCase();
-  return SPONSOR_INDICATORS.some(indicator => lower.includes(indicator));
-}
-
-function extractMeetupEventUrls(content: string): { url: string; name: string }[] {
-  const results: { url: string; name: string }[] = [];
-  const seen = new Set<string>();
-  const linkPattern = /\[([^\]]{5,120})\]\((https?:\/\/(?:www\.)?meetup\.com\/[^)]+\/events\/[^)]+)\)/g;
-  for (const match of content.matchAll(linkPattern)) {
-    const [, name, url] = match;
-    if (seen.has(url)) continue;
-    seen.add(url);
-    const cleanName = name.replace(/\s+/g, ' ').trim();
-    if (cleanName.length > 5) results.push({ url, name: cleanName });
-  }
-  return results;
-}
-
-function extractDateFromContext(context: string): string | null {
-  const patterns = [
-    /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:\s*[-–]\s*\d{1,2})?,?\s*\d{4}\b/i,
-    /\b\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4}\b/i,
-  ];
-  for (const pattern of patterns) {
-    const match = context.match(pattern);
-    if (match) return match[0];
-  }
-  return null;
-}
-
-function extractLocationFromContext(context: string): string | null {
-  const patterns = [
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*([A-Z]{2})\b/,
-    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s*([A-Z][a-z]+)\b/,
-  ];
-  for (const pattern of patterns) {
-    const match = context.match(pattern);
-    if (match) return match[0];
-  }
-  if (/\b(online|virtual|remote)\b/i.test(context)) return 'Online';
-  return null;
-}
-
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 15);
-}
