@@ -119,6 +119,7 @@ serve(async (req) => {
           throw err;
         }
 
+        console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
         const found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
         if (found.length === 0) {
           eventsWithoutSponsors.push(event.name);
@@ -237,7 +238,8 @@ async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
     tried.add(url);
 
     const content = await readPage(url, 30000);
-    if (!content || isNotFound(content)) continue;
+    if (!content) { console.log('Candidate unreadable:', url); continue; }
+    if (isNotFound(content)) { console.log('Candidate 404:', url); continue; }
 
     console.log('Sponsor page found:', url);
     // Put dedicated sponsor pages first — they drive the extraction.
