@@ -27,8 +27,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const keywords: string = (body.keywords ?? '').toString().trim();
-    const location: string | undefined = body.location?.toString().trim() || undefined;
+    const keywords: string = (body.keywords ?? '').toString().trim().toLowerCase();
+    const location: string | undefined = body.location?.toString().trim().toLowerCase() || undefined;
     const eventCount: number = typeof body.eventCount === 'number' ? Math.min(body.eventCount, 50) : 10;
 
     if (!keywords) {
@@ -42,26 +42,18 @@ serve(async (req) => {
         events: [],
         status: 'unavailable',
         message:
-          'Eventbrite is not connected. Add an Eventbrite API token to search Eventbrite; its public pages block automated reading.',
+          'Eventbrite is not connected. Add an Eventbrite API token to import your Eventbrite events; public Eventbrite search was discontinued.',
       });
     }
 
-    const params = new URLSearchParams({
-      q: keywords,
-      expand: 'venue',
-      'page_size': String(Math.min(eventCount, 50)),
-    });
-    if (location) {
-      params.set('location.address', location);
-      params.set('location.within', '100km');
-    }
-
-    const apiUrl = `https://www.eventbriteapi.com/v3/events/search/?${params.toString()}`;
+    // Eventbrite shut down its public event-search API in 2019. The only
+    // keyword-aware discovery still possible with a token is to list the
+    // authenticated user's own events and filter them locally.
+    const apiUrl = `https://www.eventbriteapi.com/v3/users/me/events/?expand=venue&order_by=start_desc&page_size=50`;
     console.log('Calling Eventbrite API:', apiUrl);
 
     const res = await fetch(apiUrl, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(30000),
     });
 
     if (!res.ok) {
@@ -70,32 +62,44 @@ serve(async (req) => {
       const message =
         res.status === 401 || res.status === 403
           ? 'Eventbrite rejected the API token. Check that the token is valid.'
-          : `Eventbrite search failed (${res.status}).`;
+          : `Eventbrite request failed (${res.status}).`;
       return json({ events: [], status: 'error', message });
     }
 
     const payload = await res.json();
     const rawEvents: EventbriteApiEvent[] = payload.events ?? [];
 
-    const events: DiscoveredEvent[] = rawEvents.slice(0, eventCount).map((e) => ({
+    const terms = keywords.split(/\s+/).filter(Boolean);
+    const filtered = rawEvents.filter((e) => {
+      const haystack = `${e.name?.text ?? ''} ${e.venue?.name ?? ''}`.toLowerCase();
+      const matchesKeyword = terms.length === 0 || terms.every((t) => haystack.includes(t));
+      const matchesLocation = !location ||
+        (e.venue?.address?.localized_address_display ?? '').toLowerCase().includes(location) ||
+        (e.venue?.name ?? '').toLowerCase().includes(location);
+      return matchesKeyword && matchesLocation;
+    });
+
+    const events: DiscoveredEvent[] = filtered.slice(0, eventCount).map((e) => ({
       id: e.id ?? generateId(),
       name: e.name?.text ?? 'Untitled event',
       url: e.url ?? '',
       date: e.start?.local ? formatDate(e.start.local) : 'TBD',
       location: e.online_event
         ? 'Online'
-        : e.venue?.address?.localized_address_display ?? e.venue?.name ?? location ?? 'See event page',
+        : e.venue?.address?.localized_address_display ?? e.venue?.name ?? 'See event page',
       source: 'eventbrite' as const,
     }));
 
-    console.log('Eventbrite events found:', events.length);
+    console.log('Eventbrite events found:', events.length, 'of', rawEvents.length);
 
     return json({
       events,
       status: events.length > 0 ? 'ok' : 'no_results',
       source: 'eventbrite',
       totalFound: events.length,
-      message: events.length === 0 ? 'Eventbrite returned no matching events.' : undefined,
+      message: events.length === 0
+        ? 'No matching events in this Eventbrite account. Public Eventbrite search is no longer available.'
+        : undefined,
     });
   } catch (error) {
     console.error('Error in event-discovery:', error);
