@@ -172,7 +172,12 @@ const Index = () => {
           {currentStep === 3 && (
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
               <EmailPreview emails={emails} />
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-between gap-3">
+                <Button variant="outline" onClick={handleGoBack}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+
                 <Button onClick={handleProceedToExport} variant="gradient">
                   Proceed to Export
                   <ArrowRight className="h-4 w-4 ml-2" />
