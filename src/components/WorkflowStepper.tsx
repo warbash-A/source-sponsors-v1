@@ -57,7 +57,8 @@ export function WorkflowStepper({ steps, currentStep, maxStepReached = currentSt
                 ) : (
                   <Icon className="h-5 w-5" />
                 )}
-              </div>
+              </button>
+
               <div className="mt-3 text-center">
                 <p
                   className={cn(
