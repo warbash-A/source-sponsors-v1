@@ -49,6 +49,8 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
     type: "",
     industry: "",
     location: "",
+    senderName: "",
+    senderOrganization: "",
   });
 
   const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(['eventbrite', 'meetup']);
@@ -69,6 +71,7 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
     formData.type &&
     formData.industry &&
     formData.location &&
+    formData.senderName?.trim() &&
     sources.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
