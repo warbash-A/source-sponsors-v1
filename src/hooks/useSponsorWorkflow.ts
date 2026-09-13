@@ -388,8 +388,12 @@ export function useSponsorWorkflow() {
 
       if (error) throw error;
 
-      // Download the file
-      const blob = new Blob([data.content], { type: data.contentType });
+      // Download the file (spreadsheets come back base64-encoded)
+      const payload =
+        data.encoding === 'base64'
+          ? Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))
+          : data.content;
+      const blob = new Blob([payload], { type: data.contentType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

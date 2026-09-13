@@ -58,8 +58,9 @@ serve(async (req) => {
     }
 
     const searchQuery = encodeURIComponent(keywords);
-    const searchUrl = location
-      ? `https://www.meetup.com/find/?keywords=${searchQuery}&location=${encodeURIComponent(location)}&source=EVENTS`
+    const locationSlug = location ? toMeetupLocation(location) : undefined;
+    const searchUrl = locationSlug
+      ? `https://www.meetup.com/find/?keywords=${searchQuery}&location=${encodeURIComponent(locationSlug)}&source=EVENTS`
       : `https://www.meetup.com/find/?keywords=${searchQuery}&source=EVENTS`;
 
     console.log('Reading Meetup search:', searchUrl);
