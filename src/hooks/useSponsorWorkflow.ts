@@ -487,6 +487,10 @@ export function useSponsorWorkflow() {
     handleProceedToExport,
     handleExport,
     resetWorkflow,
+    maxStepReached,
+    goToStep,
+    handleGoBack,
+
   };
 }
 
