@@ -141,7 +141,12 @@ const Index = () => {
           {currentStep === 2 && (
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
               <SponsorList sponsors={sponsors} showEnrichment />
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-between gap-3">
+                <Button variant="outline" onClick={handleGoBack}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+
                 <Button
                   onClick={handleGenerateEmails}
                   disabled={sponsors.length === 0 || isLoading}
