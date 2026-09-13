@@ -322,8 +322,8 @@ export function useSponsorWorkflow() {
             eventCount: s.events.length,
           })),
           eventName: eventDetails?.name || 'Your Event',
-          senderName: 'Your Name',
-          senderOrganization: eventDetails?.name,
+          senderName: eventDetails?.senderName?.trim() || 'Your Name',
+          senderOrganization: eventDetails?.senderOrganization?.trim() || undefined,
           template: 'partnership',
         }
       });
