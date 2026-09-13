@@ -50,7 +50,8 @@ const INSTRUCTIONS = [
   'You extract sponsoring organisations from the markdown of an event website.',
   'Return ONLY companies, brands or organisations that the page explicitly presents as sponsors, partners, supporters or exhibitors of this event.',
   'Never return a person\'s name, a speaker, an organiser, a job title, a navigation label, a legal/cookie link, a social network, a ticket or venue label, or the event itself.',
-  'tier must be one of: platinum, gold, silver, bronze, unknown. Use the tier heading the sponsor appears under; use "unknown" when the page states no tier.',
+  'tier must be one of: platinum, gold, silver, bronze, unknown.',
+  'When the page groups sponsors under headings with custom names (for example "Super Admin", "Admin", "Diamond", "Community", "Lead Partner"), rank the groups in the order they appear and map them to platinum, gold, silver, bronze in that order; any further groups are bronze. Use "unknown" only when the page shows no grouping at all.',
   'website: the sponsor\'s own website URL if the page links to it, otherwise an empty string.',
   'If the page contains no explicit sponsor or partner section, return an empty list. Never guess or invent sponsors.',
 ].join(' ');
