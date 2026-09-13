@@ -26,9 +26,18 @@ export interface Sponsor {
   events: string[];
 }
 
+export interface EmailRecord {
+  email: string;
+  /** true = published on the company's own site; false = an unverified pattern guess */
+  verified: boolean;
+  sourceUrl?: string;
+}
+
 export interface EnrichedSponsor extends Sponsor {
   domain?: string;
   emails: string[];
+  emailDetails?: EmailRecord[];
+  sourceUrl?: string;
   linkedinUrl?: string;
   enrichmentStatus: 'pending' | 'processing' | 'complete' | 'partial' | 'failed';
 }

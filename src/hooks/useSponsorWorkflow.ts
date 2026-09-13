@@ -162,54 +162,65 @@ export function useSponsorWorkflow() {
           : Promise.resolve({ data: { events: [] }, error: null }),
       ]);
 
+      let totalFound = 0;
+
       // --- Eventbrite result ---
       // Use inline narrowing (not a pre-evaluated boolean) so TypeScript narrows
       // ebrResult to PromiseFulfilledResult inside the if-block.
-      if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
-        const events: DiscoveredEvent[] = (ebrResult.value.data?.events ?? []).map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          date: e.date,
-          location: e.location,
-          url: e.url,
-          source: e.source,
-          sponsorCount: e.sponsorCount,
-        }));
-        setEventbriteEvents(events);
-        // Events are NOT auto-selected - user must manually select
-      } else if (wantsEventbrite) {
-        // Fallback to sample data for Eventbrite (existing behaviour)
-        const sample = getSampleEvents();
-        setEventbriteEvents(sample);
-        // Events are NOT auto-selected - user must manually select
-        toast.error(
-          wantsMeetup
-            ? 'Eventbrite search failed — showing Meetup results only'
-            : 'Failed to discover events. Using demo data.'
-        );
+      if (wantsEventbrite) {
+        if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
+          const payload = ebrResult.value.data ?? {};
+          const events: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            date: e.date,
+            location: e.location,
+            url: e.url,
+            source: 'eventbrite' as const,
+            sponsorCount: e.sponsorCount,
+          }));
+          setEventbriteEvents(events);
+          totalFound += events.length;
+          if (events.length === 0 && payload.message) {
+            toast.warning(payload.message);
+          }
+        } else {
+          setEventbriteEvents([]);
+          toast.error('Eventbrite search failed — no Eventbrite results.');
+        }
       }
 
       // --- Meetup result ---
       // Same pattern: inline narrowing for TypeScript to recognise .value
-      if (meetupResult.status === 'fulfilled' && wantsMeetup && !meetupResult.value.error) {
-        const events: DiscoveredEvent[] = (meetupResult.value.data?.events ?? []).map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          date: e.date,
-          location: e.location,
-          url: e.url,
-          source: 'meetup' as const,
-          sponsorCount: e.sponsorCount,
-        }));
-        setMeetupEvents(events);
-        // Events are NOT auto-selected - user must manually select
-      } else if (wantsMeetup) {
-        setMeetupEvents([]);
-        toast.error('Could not reach Meetup — showing Eventbrite results only');
+      if (wantsMeetup) {
+        if (meetupResult.status === 'fulfilled' && !meetupResult.value.error) {
+          const payload = meetupResult.value.data ?? {};
+          const events: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            date: e.date,
+            location: e.location,
+            url: e.url,
+            source: 'meetup' as const,
+            sponsorCount: e.sponsorCount,
+          }));
+          setMeetupEvents(events);
+          totalFound += events.length;
+          if (events.length === 0 && payload.message) {
+            toast.warning(payload.message);
+          }
+        } else {
+          setMeetupEvents([]);
+          toast.error('Could not reach Meetup — no Meetup results.');
+        }
       }
 
       updateStepStatus(2, "complete");
-      toast.success('Discovery complete');
+      if (totalFound > 0) {
+        toast.success(`Found ${totalFound} event${totalFound === 1 ? '' : 's'}`);
+      } else {
+        toast.warning('No events found. Try broader keywords or a different location.');
+      }
     } finally {
       setIsLoadingEventbrite(false);
       setIsLoadingMeetup(false);
@@ -241,9 +252,22 @@ export function useSponsorWorkflow() {
 
       if (sponsorError) throw sponsorError;
 
+      const identified = sponsorData?.sponsors ?? [];
+      const skipped: string[] = sponsorData?.eventsWithoutSponsors ?? [];
+
+      if (identified.length === 0) {
+        setSponsors([]);
+        updateStepStatus(3, "complete");
+        toast.warning(
+          sponsorData?.message ??
+            'No sponsors were listed on the selected event pages. Try events that publish a sponsors page.'
+        );
+        return;
+      }
+
       // Step 2: Enrich contacts
       const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('contact-enrichment', {
-        body: { sponsors: sponsorData.sponsors }
+        body: { sponsors: identified }
       });
 
       if (enrichError) throw enrichError;
@@ -254,20 +278,25 @@ export function useSponsorWorkflow() {
         tier: s.tier,
         website: s.website,
         domain: s.domain,
-        events: s.eventIds || [],
+        events: s.eventNames?.length ? s.eventNames : (s.eventIds || []),
         emails: s.emails || [],
+        emailDetails: s.emailDetails || [],
+        sourceUrl: s.sourceUrl,
         linkedinUrl: s.linkedinUrl,
-        enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' : 
-                         s.enrichmentStatus === 'partial' ? 'partial' : 'pending',
+        enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' :
+                         s.enrichmentStatus === 'partial' ? 'partial' : 'failed',
       }));
 
       setSponsors(enrichedSponsors);
       updateStepStatus(3, "complete");
-      toast.success(`Identified ${enrichedSponsors.length} sponsors`);
+      toast.success(
+        `Found ${enrichedSponsors.length} sponsor${enrichedSponsors.length === 1 ? '' : 's'}` +
+          (skipped.length > 0 ? ` — ${skipped.length} event page(s) listed none` : '')
+      );
     } catch (error) {
       console.error('Sponsor identification error:', error);
-      toast.error('Failed to identify sponsors. Using demo data.');
-      setSponsors(getSampleSponsors());
+      setSponsors([]);
+      toast.error('Could not read sponsors from the selected events.');
       updateStepStatus(3, "complete");
     } finally {
       setIsLoading(false);
@@ -422,22 +451,6 @@ export function useSponsorWorkflow() {
   };
 }
 
-// Fallback sample data
-function getSampleEvents(): DiscoveredEvent[] {
-  return [
-    { id: "1", name: "TechCrunch Disrupt 2024", date: "Oct 28-30, 2024", location: "San Francisco, CA", url: "https://techcrunch.com/events/disrupt-2024", source: "sample", sponsorCount: 45 },
-    { id: "2", name: "Web Summit 2024", date: "Nov 11-14, 2024", location: "Lisbon, Portugal", url: "https://websummit.com", source: "sample", sponsorCount: 120 },
-    { id: "3", name: "SaaStr Annual 2024", date: "Sep 10-12, 2024", location: "San Francisco, CA", url: "https://saastr.com/annual", source: "sample", sponsorCount: 85 },
-  ];
-}
-
-function getSampleSponsors(): EnrichedSponsor[] {
-  return [
-    { id: "s1", name: "Stripe", tier: "platinum", website: "https://stripe.com", domain: "stripe.com", events: ["1", "2"], emails: ["partnerships@stripe.com"], linkedinUrl: "https://linkedin.com/company/stripe", enrichmentStatus: "complete" },
-    { id: "s2", name: "Salesforce", tier: "gold", website: "https://salesforce.com", domain: "salesforce.com", events: ["1"], emails: ["sponsorships@salesforce.com"], linkedinUrl: "https://linkedin.com/company/salesforce", enrichmentStatus: "complete" },
-    { id: "s3", name: "HubSpot", tier: "silver", website: "https://hubspot.com", domain: "hubspot.com", events: ["2", "3"], emails: ["events@hubspot.com"], linkedinUrl: "https://linkedin.com/company/hubspot", enrichmentStatus: "complete" },
-  ];
-}
 
 function generateFallbackEmail(sponsor: EnrichedSponsor, eventName: string): string {
   return `Dear ${sponsor.name} Team,

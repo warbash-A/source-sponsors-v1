@@ -228,10 +228,24 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             {sponsor.emails.length > 0 && (
-                              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <span
+                                className="flex items-center gap-1 text-sm text-muted-foreground"
+                                title={(sponsor.emailDetails ?? []).map((e) => `${e.email}${e.verified ? '' : ' (guess)'}`).join('\n')}
+                              >
                                 <Mail className="h-3.5 w-3.5" />
                                 {sponsor.emails.length}
                               </span>
+                            )}
+                            {(sponsor.emailDetails?.length ?? 0) > 0 && (
+                              sponsor.emailDetails!.some((e) => e.verified) ? (
+                                <Badge variant="outline" className="border-success/30 bg-success/10 text-success text-[10px] px-1.5 py-0">
+                                  Verified
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning text-[10px] px-1.5 py-0">
+                                  Guessed
+                                </Badge>
+                              )
                             )}
                             {sponsor.linkedinUrl && (
                               <a
