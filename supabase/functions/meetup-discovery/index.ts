@@ -82,6 +82,9 @@ serve(async (req) => {
         instructions: [
           'You extract real events from the markdown of a Meetup search results page.',
           `Return at most ${eventCount} events that genuinely match the search topic: "${keywords}".`,
+          location
+            ? `Only include events held in or near ${location}, plus online events run by groups based there. Skip events in other regions.`
+            : '',
           'For each event give: name (the event title), url (the full meetup.com event link), date (as shown, e.g. "Wed, Sep 23 · 6:00 PM PDT"), location (city or venue, or "Online").',
           'Ignore navigation links, group pages without events, adverts, cookie notices and photo captions.',
           'If a field is not present on the page, use an empty string. Never invent an event or a URL.',
@@ -136,3 +139,22 @@ serve(async (req) => {
     });
   }
 });
+
+/**
+ * Meetup's search only honours its own location slugs ("us--ca--San Francisco").
+ * Plain free text is ignored and returns results from anywhere.
+ */
+function toMeetupLocation(input: string): string {
+  const raw = input.trim();
+  if (raw.includes('--')) return raw;
+
+  const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+  const city = parts[0];
+  if (!city) return raw;
+
+  const region = parts[1];
+  if (region && /^[A-Za-z]{2}$/.test(region)) {
+    return `us--${region.toLowerCase()}--${city}`;
+  }
+  return `us--${city}`;
+}
