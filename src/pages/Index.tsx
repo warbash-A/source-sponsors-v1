@@ -69,7 +69,13 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Workflow Stepper */}
         <div className="mb-8">
-          <WorkflowStepper steps={steps} currentStep={currentStep} />
+          <WorkflowStepper
+            steps={steps}
+            currentStep={currentStep}
+            maxStepReached={maxStepReached}
+            onStepClick={goToStep}
+          />
+
         </div>
 
         {/* Step Content */}
