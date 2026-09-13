@@ -179,34 +179,77 @@ serve(async (req) => {
   }
 });
 
-/** Looks for a dedicated sponsors/partners page linked from the event page. */
-async function findSponsorPage(eventUrl: string): Promise<string> {
+const SPONSOR_SLUGS = ['sponsors', 'sponsorship', 'partners', 'our-sponsors', 'sponsors-partners', 'exhibitors'];
+
+interface Page { url: string; content: string }
+
+/**
+ * Gathers the pages most likely to list sponsors: dedicated sponsor/partner pages
+ * linked from the event page, common sponsor URLs, and the event page itself.
+ */
+async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
+  const pages: Page[] = [];
+  const tried = new Set<string>();
+
   const home = await readPage(eventUrl, 30000);
-  if (!home) return eventUrl;
+  if (home) {
+    tried.add(eventUrl);
+    pages.push({ url: eventUrl, content: home });
+  }
 
-  const linkPattern = /\[([^\]]{2,80})\]\((https?:\/\/[^)\s]+)\)/g;
-  const keywords = ['sponsor', 'partner', 'exhibitor', 'supporter'];
   let origin = '';
+  let base = '';
   try {
-    origin = new URL(eventUrl).hostname.replace(/^www\./, '');
+    const parsed = new URL(eventUrl);
+    origin = parsed.hostname.replace(/^www\./, '');
+    base = `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '')}`;
   } catch {
-    return eventUrl;
+    return pages;
   }
 
-  for (const match of home.matchAll(linkPattern)) {
-    const [, label, url] = match;
-    const haystack = `${label} ${url}`.toLowerCase();
-    if (!keywords.some((k) => haystack.includes(k))) continue;
-    try {
-      if (!new URL(url).hostname.replace(/^www\./, '').endsWith(origin)) continue;
-    } catch {
-      continue;
+  const candidates: string[] = [];
+
+  // 1. Links on the event page whose label or URL mentions sponsors/partners.
+  if (home) {
+    const linkPattern = /\[([^\]]{2,80})\]\((https?:\/\/[^)\s]+)\)/g;
+    for (const match of home.matchAll(linkPattern)) {
+      const [, label, url] = match;
+      const haystack = `${label} ${url}`.toLowerCase();
+      if (!['sponsor', 'partner', 'exhibitor', 'supporter'].some((k) => haystack.includes(k))) continue;
+      try {
+        if (!new URL(url).hostname.replace(/^www\./, '').endsWith(origin)) continue;
+      } catch {
+        continue;
+      }
+      candidates.push(url.replace(/#.*$/, ''));
     }
-    console.log('Found sponsor page:', url);
-    return url;
   }
 
-  return eventUrl;
+  // 2. Common sponsor URLs, relative to the event path and to the site root.
+  for (const slug of SPONSOR_SLUGS) {
+    candidates.push(`${base}/${slug}/`);
+    candidates.push(`https://${origin}/${slug}/`);
+  }
+
+  for (const url of candidates) {
+    if (pages.length >= 3) break;
+    if (tried.has(url)) continue;
+    tried.add(url);
+
+    const content = await readPage(url, 30000);
+    if (!content || isNotFound(content)) continue;
+
+    console.log('Sponsor page found:', url);
+    // Put dedicated sponsor pages first — they drive the extraction.
+    pages.unshift({ url, content });
+  }
+
+  return pages;
+}
+
+function isNotFound(content: string): boolean {
+  const head = content.substring(0, 600).toLowerCase();
+  return head.includes('error 404') || head.includes('page not found') || head.includes('404 not found');
 }
 
 /** Rejects obvious non-company strings the model may still return. */
