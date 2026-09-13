@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,7 +7,7 @@ const corsHeaders = {
 };
 
 interface ExportRequest {
-  format: 'csv' | 'json' | 'txt';
+  format: 'csv' | 'json' | 'txt' | 'excel';
   data: {
     events?: any[];
     sponsors?: any[];
@@ -27,6 +28,7 @@ serve(async (req) => {
     let content: string;
     let contentType: string;
     let filename: string;
+    let encoding: 'utf8' | 'base64' = 'utf8';
 
     switch (format) {
       case 'csv':
@@ -34,7 +36,14 @@ serve(async (req) => {
         contentType = 'text/csv';
         filename = `sponsor-data-${Date.now()}.csv`;
         break;
-      
+
+      case 'excel':
+        content = generateWorkbook(data);
+        encoding = 'base64';
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        filename = `sponsor-data-${Date.now()}.xlsx`;
+        break;
+
       case 'json':
         content = JSON.stringify(data, null, 2);
         contentType = 'application/json';
@@ -55,6 +64,7 @@ serve(async (req) => {
       content,
       filename,
       contentType,
+      encoding,
       size: content.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
