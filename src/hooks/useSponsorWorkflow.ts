@@ -162,54 +162,65 @@ export function useSponsorWorkflow() {
           : Promise.resolve({ data: { events: [] }, error: null }),
       ]);
 
+      let totalFound = 0;
+
       // --- Eventbrite result ---
       // Use inline narrowing (not a pre-evaluated boolean) so TypeScript narrows
       // ebrResult to PromiseFulfilledResult inside the if-block.
-      if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
-        const events: DiscoveredEvent[] = (ebrResult.value.data?.events ?? []).map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          date: e.date,
-          location: e.location,
-          url: e.url,
-          source: e.source,
-          sponsorCount: e.sponsorCount,
-        }));
-        setEventbriteEvents(events);
-        // Events are NOT auto-selected - user must manually select
-      } else if (wantsEventbrite) {
-        // Fallback to sample data for Eventbrite (existing behaviour)
-        const sample = getSampleEvents();
-        setEventbriteEvents(sample);
-        // Events are NOT auto-selected - user must manually select
-        toast.error(
-          wantsMeetup
-            ? 'Eventbrite search failed — showing Meetup results only'
-            : 'Failed to discover events. Using demo data.'
-        );
+      if (wantsEventbrite) {
+        if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
+          const payload = ebrResult.value.data ?? {};
+          const events: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            date: e.date,
+            location: e.location,
+            url: e.url,
+            source: 'eventbrite' as const,
+            sponsorCount: e.sponsorCount,
+          }));
+          setEventbriteEvents(events);
+          totalFound += events.length;
+          if (events.length === 0 && payload.message) {
+            toast.warning(payload.message);
+          }
+        } else {
+          setEventbriteEvents([]);
+          toast.error('Eventbrite search failed — no Eventbrite results.');
+        }
       }
 
       // --- Meetup result ---
       // Same pattern: inline narrowing for TypeScript to recognise .value
-      if (meetupResult.status === 'fulfilled' && wantsMeetup && !meetupResult.value.error) {
-        const events: DiscoveredEvent[] = (meetupResult.value.data?.events ?? []).map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          date: e.date,
-          location: e.location,
-          url: e.url,
-          source: 'meetup' as const,
-          sponsorCount: e.sponsorCount,
-        }));
-        setMeetupEvents(events);
-        // Events are NOT auto-selected - user must manually select
-      } else if (wantsMeetup) {
-        setMeetupEvents([]);
-        toast.error('Could not reach Meetup — showing Eventbrite results only');
+      if (wantsMeetup) {
+        if (meetupResult.status === 'fulfilled' && !meetupResult.value.error) {
+          const payload = meetupResult.value.data ?? {};
+          const events: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            date: e.date,
+            location: e.location,
+            url: e.url,
+            source: 'meetup' as const,
+            sponsorCount: e.sponsorCount,
+          }));
+          setMeetupEvents(events);
+          totalFound += events.length;
+          if (events.length === 0 && payload.message) {
+            toast.warning(payload.message);
+          }
+        } else {
+          setMeetupEvents([]);
+          toast.error('Could not reach Meetup — no Meetup results.');
+        }
       }
 
       updateStepStatus(2, "complete");
-      toast.success('Discovery complete');
+      if (totalFound > 0) {
+        toast.success(`Found ${totalFound} event${totalFound === 1 ? '' : 's'}`);
+      } else {
+        toast.warning('No events found. Try broader keywords or a different location.');
+      }
     } finally {
       setIsLoadingEventbrite(false);
       setIsLoadingMeetup(false);
