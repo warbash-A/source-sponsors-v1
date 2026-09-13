@@ -252,9 +252,22 @@ export function useSponsorWorkflow() {
 
       if (sponsorError) throw sponsorError;
 
+      const identified = sponsorData?.sponsors ?? [];
+      const skipped: string[] = sponsorData?.eventsWithoutSponsors ?? [];
+
+      if (identified.length === 0) {
+        setSponsors([]);
+        updateStepStatus(3, "complete");
+        toast.warning(
+          sponsorData?.message ??
+            'No sponsors were listed on the selected event pages. Try events that publish a sponsors page.'
+        );
+        return;
+      }
+
       // Step 2: Enrich contacts
       const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('contact-enrichment', {
-        body: { sponsors: sponsorData.sponsors }
+        body: { sponsors: identified }
       });
 
       if (enrichError) throw enrichError;
@@ -265,20 +278,25 @@ export function useSponsorWorkflow() {
         tier: s.tier,
         website: s.website,
         domain: s.domain,
-        events: s.eventIds || [],
+        events: s.eventNames?.length ? s.eventNames : (s.eventIds || []),
         emails: s.emails || [],
+        emailDetails: s.emailDetails || [],
+        sourceUrl: s.sourceUrl,
         linkedinUrl: s.linkedinUrl,
-        enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' : 
-                         s.enrichmentStatus === 'partial' ? 'partial' : 'pending',
+        enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' :
+                         s.enrichmentStatus === 'partial' ? 'partial' : 'failed',
       }));
 
       setSponsors(enrichedSponsors);
       updateStepStatus(3, "complete");
-      toast.success(`Identified ${enrichedSponsors.length} sponsors`);
+      toast.success(
+        `Found ${enrichedSponsors.length} sponsor${enrichedSponsors.length === 1 ? '' : 's'}` +
+          (skipped.length > 0 ? ` — ${skipped.length} event page(s) listed none` : '')
+      );
     } catch (error) {
       console.error('Sponsor identification error:', error);
-      toast.error('Failed to identify sponsors. Using demo data.');
-      setSponsors(getSampleSponsors());
+      setSponsors([]);
+      toast.error('Could not read sponsors from the selected events.');
       updateStepStatus(3, "complete");
     } finally {
       setIsLoading(false);
