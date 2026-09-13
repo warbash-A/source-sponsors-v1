@@ -46,30 +46,54 @@ serve(async (req) => {
       });
     }
 
-    // Eventbrite shut down its public event-search API in 2019. The only
-    // keyword-aware discovery still possible with a token is to list the
-    // authenticated user's own events and filter them locally.
-    const apiUrl = `https://www.eventbriteapi.com/v3/users/me/events/?expand=venue&order_by=start_desc&page_size=50`;
-    console.log('Calling Eventbrite API:', apiUrl);
-
-    const res = await fetch(apiUrl, {
+    // Eventbrite shut down its public event-search API in 2019. The current
+    // way to read events with a token is via the user's organizations.
+    const orgsRes = await fetch('https://www.eventbriteapi.com/v3/users/me/organizations/', {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      console.error('Eventbrite API error', res.status, detail.substring(0, 400));
+    if (!orgsRes.ok) {
+      const detail = await orgsRes.text().catch(() => '');
+      console.error('Eventbrite organizations error', orgsRes.status, detail.substring(0, 400));
       const message =
-        res.status === 401 || res.status === 403
+        orgsRes.status === 401 || orgsRes.status === 403
           ? 'Eventbrite rejected the API token. Check that the token is valid.'
-          : `Eventbrite request failed (${res.status}).`;
+          : `Eventbrite request failed (${orgsRes.status}).`;
       return json({ events: [], status: 'error', message });
     }
 
-    const payload = await res.json();
-    const rawEvents: EventbriteApiEvent[] = payload.events ?? [];
+    const orgsPayload = await orgsRes.json();
+    const organizations: { id: string }[] = orgsPayload.organizations ?? [];
+    console.log('Eventbrite organizations:', organizations.length);
+
+    if (organizations.length === 0) {
+      return json({
+        events: [],
+        status: 'no_results',
+        source: 'eventbrite',
+        totalFound: 0,
+        message: 'This Eventbrite account has no organizations. Public Eventbrite search is no longer available.',
+      });
+    }
 
     const terms = keywords.split(/\s+/).filter(Boolean);
+    const rawEvents: EventbriteApiEvent[] = [];
+
+    await Promise.all(
+      organizations.slice(0, 5).map(async (org) => {
+        const eventsRes = await fetch(
+          `https://www.eventbriteapi.com/v3/organizations/${org.id}/events/?expand=venue&page_size=50&status=live,started,ended`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!eventsRes.ok) {
+          console.error('Eventbrite org events error', org.id, eventsRes.status);
+          return;
+        }
+        const eventsPayload = await eventsRes.json();
+        rawEvents.push(...(eventsPayload.events ?? []));
+      })
+    );
+
     const filtered = rawEvents.filter((e) => {
       const haystack = `${e.name?.text ?? ''} ${e.venue?.name ?? ''}`.toLowerCase();
       const matchesKeyword = terms.length === 0 || terms.every((t) => haystack.includes(t));
