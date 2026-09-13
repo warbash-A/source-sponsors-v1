@@ -50,7 +50,7 @@ serve(async (req) => {
       };
 
       try {
-        const domain = extractDomain(sponsor.website);
+        const domain = extractDomain(sponsor.website) ?? (await resolveDomain(sponsor.name));
         enriched.domain = domain;
 
         if (domain) {
@@ -126,6 +126,27 @@ function extractDomain(website?: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * When the sponsor list gave no website, try the obvious domain for the company
+ * name and only accept it if the live homepage actually mentions that company.
+ */
+async function resolveDomain(name: string): Promise<string | undefined> {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const hyphen = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (slug.length < 3) return undefined;
+
+  const candidates = [...new Set([`${slug}.com`, `${hyphen}.com`])].slice(0, 2);
+  const needle = slug;
+
+  for (const candidate of candidates) {
+    const content = await readPage(`https://${candidate}`, 8000);
+    if (!content) continue;
+    const normalised = content.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (normalised.includes(needle)) return candidate;
+  }
+  return undefined;
 }
 
 function extractEmails(content: string, domain: string): string[] {

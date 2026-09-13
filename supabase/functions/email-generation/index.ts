@@ -1,8 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { aiExtract, AiGatewayError } from "../_shared/ai-extract.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const EMAIL_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['subject', 'body'],
+  properties: {
+    subject: { type: 'string' },
+    body: { type: 'string' },
+  },
 };
 
 interface EnrichedSponsor {
@@ -42,56 +53,46 @@ serve(async (req) => {
     const { sponsors, eventName, senderName, senderOrganization, template = 'partnership' }: EmailRequest = await req.json();
     console.log('Email generation for sponsors:', sponsors.length);
 
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     const emails: EmailDraft[] = [];
+    const eventLabel = eventName?.trim() || 'your upcoming events';
+    let aiCount = 0;
+    let aiMessage: string | undefined;
 
     for (const sponsor of sponsors) {
       console.log('Generating email for:', sponsor.name);
-      
+
       const primaryEmail = sponsor.emails[0] || `contact@${sponsor.domain || 'company.com'}`;
-      
-      let emailBody: string;
-      let subject: string;
 
-      if (ANTHROPIC_API_KEY) {
+      let subject = generateSubject(sponsor, eventLabel, template);
+      let emailBody = generateTemplateEmail(sponsor, eventLabel, senderName, senderOrganization, template);
+
+      if (!aiMessage) {
         try {
-          const prompt = buildEmailPrompt(sponsor, eventName, senderName, senderOrganization, template);
-
-          const response = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "x-api-key": ANTHROPIC_API_KEY,
-              "anthropic-version": "2023-06-01",
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "claude-sonnet-4-6",
-              max_tokens: 500,
-              system: "You are an expert at writing professional, personalized business outreach emails. Write concise, compelling emails that feel genuine and not generic. Keep emails under 200 words.",
-              messages: [{ role: "user", content: prompt }],
-            }),
+          const generated = await aiExtract<{ subject: string; body: string }>({
+            name: 'outreach_email',
+            schema: EMAIL_SCHEMA as unknown as Record<string, unknown>,
+            instructions:
+              'You write professional, personalised sponsorship outreach emails. Keep the body under 180 words, concrete and genuine, never generic filler. Sign off with the sender name. Return a subject line and a plain-text body.',
+            content: buildEmailPrompt(sponsor, eventLabel, senderName, senderOrganization, template),
           });
-
-          if (response.ok) {
-            const data = await response.json();
-            const generatedContent = data.content[0]?.text || '';
-            const parsed = parseEmailContent(generatedContent);
-            subject = parsed.subject || generateSubject(sponsor, eventName, template);
-            emailBody = parsed.body || generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
-          } else {
-            console.log('Anthropic API failed with status:', response.status);
-            subject = generateSubject(sponsor, eventName, template);
-            emailBody = generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
+          if (generated.subject?.trim() && generated.body?.trim()) {
+            subject = generated.subject.trim();
+            emailBody = generated.body.trim();
+            aiCount++;
           }
         } catch (error) {
-          console.error('Anthropic generation error:', error);
-          subject = generateSubject(sponsor, eventName, template);
-          emailBody = generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
+          if (error instanceof AiGatewayError) {
+            aiMessage =
+              error.status === 402
+                ? 'AI credits are exhausted, so the remaining emails use the built-in template.'
+                : error.status === 429
+                  ? 'Rate limited by the AI service, so the remaining emails use the built-in template.'
+                  : 'AI writing was unavailable, so the built-in template was used.';
+            console.error('AI email generation blocked:', error.status, error.message);
+          } else {
+            console.error('Email generation error:', error);
+          }
         }
-      } else {
-        // No API key, use template
-        subject = generateSubject(sponsor, eventName, template);
-        emailBody = generateTemplateEmail(sponsor, eventName, senderName, senderOrganization, template);
       }
 
       emails.push({
@@ -107,7 +108,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       emails,
       totalGenerated: emails.length,
-      usedAI: !!ANTHROPIC_API_KEY,
+      usedAI: aiCount > 0,
+      aiGenerated: aiCount,
+      message: aiMessage,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

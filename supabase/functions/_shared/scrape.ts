@@ -19,25 +19,36 @@ export function generateId(): string {
  * Returns null when the page is unreachable or protected by a bot check.
  */
 export async function readPage(url: string, maxChars = 30000): Promise<string | null> {
-  try {
-    const res = await fetch(`https://r.jina.ai/${url}`, {
-      headers: { 'Accept': 'text/plain' },
-      signal: AbortSignal.timeout(45000),
-    });
-    if (!res.ok) {
-      console.log('Reader failed', res.status, url);
-      return null;
+  // The free reader rate-limits bursts with 429s; back off and retry instead of
+  // treating a throttled request as "page has no content".
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`https://r.jina.ai/${url}`, {
+        headers: { 'Accept': 'text/plain' },
+        signal: AbortSignal.timeout(45000),
+      });
+      if (res.status === 429 || res.status === 503) {
+        await res.body?.cancel();
+        console.log('Reader throttled, retrying', res.status, url);
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) {
+        console.log('Reader failed', res.status, url);
+        return null;
+      }
+      const text = await res.text();
+      if (isBlocked(text)) {
+        console.log('Reader blocked by bot check:', url);
+        return null;
+      }
+      return text.substring(0, maxChars);
+    } catch (err) {
+      console.error('Reader error', url, err);
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }
-    const text = await res.text();
-    if (isBlocked(text)) {
-      console.log('Reader blocked by bot check:', url);
-      return null;
-    }
-    return text.substring(0, maxChars);
-  } catch (err) {
-    console.error('Reader error', url, err);
-    return null;
   }
+  return null;
 }
 
 /** Detects CAPTCHA / human-verification interstitials returned instead of content. */
