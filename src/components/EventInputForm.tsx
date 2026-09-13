@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Building2, Tag, Sparkles } from "lucide-react";
+import { MapPin, Building2, Tag, Sparkles, User, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -150,6 +150,35 @@ export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
             placeholder="e.g., San Francisco, CA"
             value={formData.location}
             onChange={(e) => handleChange("location", e.target.value)}
+            className="bg-secondary/50 border-border focus:border-primary"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="senderName" className="flex items-center gap-2 text-foreground">
+            <User className="h-4 w-4 text-primary" />
+            Your Name
+          </Label>
+          <Input
+            id="senderName"
+            placeholder="e.g., Alex Rivera"
+            value={formData.senderName ?? ""}
+            onChange={(e) => handleChange("senderName", e.target.value)}
+            className="bg-secondary/50 border-border focus:border-primary"
+          />
+          <p className="text-xs text-muted-foreground">Used to sign your outreach emails.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="senderOrganization" className="flex items-center gap-2 text-foreground">
+            <Briefcase className="h-4 w-4 text-primary" />
+            Your Company <span className="text-muted-foreground font-normal">(optional)</span>
+          </Label>
+          <Input
+            id="senderOrganization"
+            placeholder="e.g., SponsorScout"
+            value={formData.senderOrganization ?? ""}
+            onChange={(e) => handleChange("senderOrganization", e.target.value)}
             className="bg-secondary/50 border-border focus:border-primary"
           />
         </div>
