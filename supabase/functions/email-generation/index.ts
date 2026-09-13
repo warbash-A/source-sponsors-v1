@@ -1,8 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { aiExtract, AiGatewayError } from "../_shared/ai-extract.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const EMAIL_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['subject', 'body'],
+  properties: {
+    subject: { type: 'string' },
+    body: { type: 'string' },
+  },
 };
 
 interface EnrichedSponsor {
