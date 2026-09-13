@@ -1,4 +1,4 @@
-import { Search, RotateCcw, ArrowRight } from "lucide-react";
+import { Search, RotateCcw, ArrowRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WorkflowStepper } from "@/components/WorkflowStepper";
 import { EventInputForm } from "@/components/EventInputForm";
