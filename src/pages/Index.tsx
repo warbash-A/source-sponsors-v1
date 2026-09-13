@@ -30,7 +30,11 @@ const Index = () => {
     handleProceedToExport,
     handleExport,
     resetWorkflow,
+    maxStepReached,
+    goToStep,
+    handleGoBack,
   } = useSponsorWorkflow();
+
 
   return (
     <div className="min-h-screen bg-background">
