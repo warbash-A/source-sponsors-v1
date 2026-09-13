@@ -117,6 +117,13 @@ export function useSponsorWorkflow() {
   const [emails, setEmails] = useState<EmailDraft[]>([]);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [completedExports, setCompletedExports] = useState<ExportFormat[]>([]);
+  // Highest step the user has reached — lets them navigate back and forward again
+  const [maxStepReached, setMaxStepReached] = useState<number>(stored.currentStep);
+
+  useEffect(() => {
+    setMaxStepReached((prev) => (currentStep > prev ? currentStep : prev));
+  }, [currentStep]);
+
 
   const updateStepStatus = useCallback((stepId: number, status: WorkflowStep['status']) => {
     setSteps((prev) =>
