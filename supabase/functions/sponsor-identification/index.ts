@@ -81,14 +81,19 @@ serve(async (req) => {
       }
 
       try {
-        const pageUrl = await findSponsorPage(event.url);
-        const content = await readPage(pageUrl, 30000);
+        const pages = await collectSponsorPages(event.url);
 
-        if (!content) {
-          console.log('Could not read page for event:', event.name);
+        if (pages.length === 0) {
+          console.log('Could not read any page for event:', event.name);
           eventsWithoutSponsors.push(event.name);
           continue;
         }
+
+        const pageUrl = pages[0].url;
+        const content = pages
+          .map((p) => `--- SOURCE: ${p.url} ---\n${p.content}`)
+          .join('\n\n')
+          .substring(0, 45000);
 
         let extracted: ExtractedSponsors;
         try {
