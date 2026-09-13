@@ -1,4 +1,4 @@
-import { Search, RotateCcw, ArrowRight } from "lucide-react";
+import { Search, RotateCcw, ArrowRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WorkflowStepper } from "@/components/WorkflowStepper";
 import { EventInputForm } from "@/components/EventInputForm";
@@ -30,7 +30,11 @@ const Index = () => {
     handleProceedToExport,
     handleExport,
     resetWorkflow,
+    maxStepReached,
+    goToStep,
+    handleGoBack,
   } = useSponsorWorkflow();
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -65,7 +69,13 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Workflow Stepper */}
         <div className="mb-8">
-          <WorkflowStepper steps={steps} currentStep={currentStep} />
+          <WorkflowStepper
+            steps={steps}
+            currentStep={currentStep}
+            maxStepReached={maxStepReached}
+            onStepClick={goToStep}
+          />
+
         </div>
 
         {/* Step Content */}
@@ -81,7 +91,7 @@ const Index = () => {
                   Tell us about your event to find similar conferences and their sponsors
                 </p>
               </div>
-              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEventbrite || isLoadingMeetup} />
+              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEventbrite || isLoadingMeetup} initialValues={eventDetails} />
             </div>
           )}
 
@@ -99,7 +109,12 @@ const Index = () => {
                   showEventbrite={eventDetails?.sources?.includes('eventbrite') ?? true}
                   showMeetup={eventDetails?.sources?.includes('meetup') ?? false}
                 />
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex justify-between gap-3">
+                  <Button variant="outline" onClick={handleGoBack}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+
                   <Button
                     onClick={handleProceedToSponsors}
                     disabled={selectedEventIds.length === 0 || isLoadingEventbrite || isLoadingMeetup || isLoading}
@@ -126,7 +141,12 @@ const Index = () => {
           {currentStep === 2 && (
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
               <SponsorList sponsors={sponsors} showEnrichment />
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-between gap-3">
+                <Button variant="outline" onClick={handleGoBack}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+
                 <Button
                   onClick={handleGenerateEmails}
                   disabled={sponsors.length === 0 || isLoading}
@@ -152,7 +172,12 @@ const Index = () => {
           {currentStep === 3 && (
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
               <EmailPreview emails={emails} />
-              <div className="mt-6 flex justify-end">
+              <div className="mt-6 flex justify-between gap-3">
+                <Button variant="outline" onClick={handleGoBack}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+
                 <Button onClick={handleProceedToExport} variant="gradient">
                   Proceed to Export
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -169,7 +194,14 @@ const Index = () => {
                 exportingFormat={exportingFormat}
                 completedFormats={completedExports}
               />
+              <div className="mt-6 flex justify-start">
+                <Button variant="outline" onClick={handleGoBack}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              </div>
             </div>
+
           )}
         </div>
       </main>

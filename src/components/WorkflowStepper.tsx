@@ -5,11 +5,14 @@ import type { WorkflowStep } from "@/types/sponsor";
 interface WorkflowStepperProps {
   steps: WorkflowStep[];
   currentStep: number;
+  maxStepReached?: number;
+  onStepClick?: (step: number) => void;
 }
 
 const stepIcons = [Search, Globe, Users, Mail, FileDown];
 
-export function WorkflowStepper({ steps, currentStep }: WorkflowStepperProps) {
+export function WorkflowStepper({ steps, currentStep, maxStepReached = currentStep, onStepClick }: WorkflowStepperProps) {
+
   return (
     <div className="w-full py-6">
       <div className="relative flex items-center justify-between">
@@ -29,23 +32,33 @@ export function WorkflowStepper({ steps, currentStep }: WorkflowStepperProps) {
           const isPending = step.status === 'pending';
           const isError = step.status === 'error';
 
+          const isClickable = Boolean(onStepClick) && index <= maxStepReached;
+
           return (
             <div key={step.id} className="relative z-10 flex flex-col items-center">
-              <div
+              <button
+                type="button"
+                disabled={!isClickable}
+                onClick={() => isClickable && onStepClick?.(index)}
+                title={isClickable ? `Go to ${step.name}` : undefined}
                 className={cn(
                   "flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-300",
+                  isClickable && "cursor-pointer hover:scale-105",
+                  !isClickable && "cursor-default",
                   isComplete && "border-primary bg-primary text-primary-foreground",
                   isActive && "border-primary bg-background text-primary animate-pulse-glow",
                   isPending && "border-border bg-background text-muted-foreground",
                   isError && "border-destructive bg-destructive/10 text-destructive"
                 )}
               >
+
                 {isComplete ? (
                   <Check className="h-5 w-5" />
                 ) : (
                   <Icon className="h-5 w-5" />
                 )}
-              </div>
+              </button>
+
               <div className="mt-3 text-center">
                 <p
                   className={cn(

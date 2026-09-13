@@ -117,6 +117,13 @@ export function useSponsorWorkflow() {
   const [emails, setEmails] = useState<EmailDraft[]>([]);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [completedExports, setCompletedExports] = useState<ExportFormat[]>([]);
+  // Highest step the user has reached — lets them navigate back and forward again
+  const [maxStepReached, setMaxStepReached] = useState<number>(stored.currentStep);
+
+  useEffect(() => {
+    setMaxStepReached((prev) => (currentStep > prev ? currentStep : prev));
+  }, [currentStep]);
+
 
   const updateStepStatus = useCallback((stepId: number, status: WorkflowStep['status']) => {
     setSteps((prev) =>
@@ -434,10 +441,33 @@ export function useSponsorWorkflow() {
     setEmails([]);
     setExportingFormat(null);
     setCompletedExports([]);
+    setMaxStepReached(0);
   }, []);
+
+  // Navigate to any step already reached, without losing data
+  const goToStep = useCallback((step: number) => {
+    if (step < 0 || step > maxStepReached) return;
+    setCurrentStep(step);
+    setSteps((prev) =>
+      prev.map((s) => ({
+        ...s,
+        status:
+          s.id === step + 1
+            ? 'active'
+            : s.id <= maxStepReached + 1
+              ? 'complete'
+              : 'pending',
+      }))
+    );
+  }, [maxStepReached]);
+
+  const handleGoBack = useCallback(() => {
+    goToStep(Math.max(0, currentStep - 1));
+  }, [currentStep, goToStep]);
 
   return {
     currentStep,
+
     steps,
     eventDetails,
     eventbriteEvents,
@@ -457,6 +487,10 @@ export function useSponsorWorkflow() {
     handleProceedToExport,
     handleExport,
     resetWorkflow,
+    maxStepReached,
+    goToStep,
+    handleGoBack,
+
   };
 }
 
