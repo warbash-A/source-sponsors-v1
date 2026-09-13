@@ -451,22 +451,6 @@ export function useSponsorWorkflow() {
   };
 }
 
-// Fallback sample data
-function getSampleEvents(): DiscoveredEvent[] {
-  return [
-    { id: "1", name: "TechCrunch Disrupt 2024", date: "Oct 28-30, 2024", location: "San Francisco, CA", url: "https://techcrunch.com/events/disrupt-2024", source: "sample", sponsorCount: 45 },
-    { id: "2", name: "Web Summit 2024", date: "Nov 11-14, 2024", location: "Lisbon, Portugal", url: "https://websummit.com", source: "sample", sponsorCount: 120 },
-    { id: "3", name: "SaaStr Annual 2024", date: "Sep 10-12, 2024", location: "San Francisco, CA", url: "https://saastr.com/annual", source: "sample", sponsorCount: 85 },
-  ];
-}
-
-function getSampleSponsors(): EnrichedSponsor[] {
-  return [
-    { id: "s1", name: "Stripe", tier: "platinum", website: "https://stripe.com", domain: "stripe.com", events: ["1", "2"], emails: ["partnerships@stripe.com"], linkedinUrl: "https://linkedin.com/company/stripe", enrichmentStatus: "complete" },
-    { id: "s2", name: "Salesforce", tier: "gold", website: "https://salesforce.com", domain: "salesforce.com", events: ["1"], emails: ["sponsorships@salesforce.com"], linkedinUrl: "https://linkedin.com/company/salesforce", enrichmentStatus: "complete" },
-    { id: "s3", name: "HubSpot", tier: "silver", website: "https://hubspot.com", domain: "hubspot.com", events: ["2", "3"], emails: ["events@hubspot.com"], linkedinUrl: "https://linkedin.com/company/hubspot", enrichmentStatus: "complete" },
-  ];
-}
 
 function generateFallbackEmail(sponsor: EnrichedSponsor, eventName: string): string {
   return `Dear ${sponsor.name} Team,
