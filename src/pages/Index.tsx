@@ -194,7 +194,14 @@ const Index = () => {
                 exportingFormat={exportingFormat}
                 completedFormats={completedExports}
               />
+              <div className="mt-6 flex justify-start">
+                <Button variant="outline" onClick={handleGoBack}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              </div>
             </div>
+
           )}
         </div>
       </main>
