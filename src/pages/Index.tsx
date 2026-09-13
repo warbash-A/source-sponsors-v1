@@ -91,7 +91,7 @@ const Index = () => {
                   Tell us about your event to find similar conferences and their sponsors
                 </p>
               </div>
-              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEventbrite || isLoadingMeetup} />
+              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEventbrite || isLoadingMeetup} initialValues={eventDetails} />
             </div>
           )}
 
