@@ -16,7 +16,9 @@ import type { EventDetails } from "@/types/sponsor";
 interface EventInputFormProps {
   onSubmit: (details: EventDetails) => void;
   isLoading?: boolean;
+  initialValues?: EventDetails | null;
 }
+
 
 const eventTypes = [
   "Conference",
