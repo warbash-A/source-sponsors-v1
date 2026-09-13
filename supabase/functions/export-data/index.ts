@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,7 +7,7 @@ const corsHeaders = {
 };
 
 interface ExportRequest {
-  format: 'csv' | 'json' | 'txt';
+  format: 'csv' | 'json' | 'txt' | 'excel';
   data: {
     events?: any[];
     sponsors?: any[];
@@ -27,6 +28,7 @@ serve(async (req) => {
     let content: string;
     let contentType: string;
     let filename: string;
+    let encoding: 'utf8' | 'base64' = 'utf8';
 
     switch (format) {
       case 'csv':
@@ -34,7 +36,14 @@ serve(async (req) => {
         contentType = 'text/csv';
         filename = `sponsor-data-${Date.now()}.csv`;
         break;
-      
+
+      case 'excel':
+        content = generateWorkbook(data);
+        encoding = 'base64';
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        filename = `sponsor-data-${Date.now()}.xlsx`;
+        break;
+
       case 'json':
         content = JSON.stringify(data, null, 2);
         contentType = 'application/json';
@@ -55,6 +64,7 @@ serve(async (req) => {
       content,
       filename,
       contentType,
+      encoding,
       size: content.length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -67,6 +77,46 @@ serve(async (req) => {
     });
   }
 });
+
+/** Real multi-sheet .xlsx workbook (events, sponsors, emails), returned base64-encoded. */
+function generateWorkbook(data: ExportRequest['data']): string {
+  const wb = XLSX.utils.book_new();
+
+  const events = (data.events || []).map((e: any) => ({
+    Name: e.name || '',
+    Date: e.date || '',
+    Location: e.location || '',
+    Source: e.source || '',
+    URL: e.url || '',
+  }));
+
+  const sponsors = (data.sponsors || []).map((s: any) => ({
+    Name: s.name || '',
+    Tier: s.tier || 'unknown',
+    Website: s.website || s.domain || '',
+    Emails: (s.emails || []).join('; '),
+    'Verified Emails': (s.emailDetails || []).filter((d: any) => d.verified).map((d: any) => d.email).join('; '),
+    LinkedIn: s.linkedinUrl || '',
+    Events: Array.isArray(s.events) ? s.events.join('; ') : '',
+    'Event Count': s.eventCount ?? (Array.isArray(s.events) ? s.events.length : 1),
+    Status: s.enrichmentStatus || 'unknown',
+    'Found On': s.sourceUrl || '',
+  }));
+
+  const emails = (data.emails || []).map((m: any) => ({
+    Sponsor: m.sponsorName || '',
+    To: m.to || '',
+    Subject: m.subject || '',
+    Body: m.body || '',
+    'Written By': m.generatedWith || '',
+  }));
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(events.length ? events : [{ Name: 'No events' }]), 'Events');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sponsors.length ? sponsors : [{ Name: 'No sponsors' }]), 'Sponsors');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(emails.length ? emails : [{ Sponsor: 'No emails' }]), 'Emails');
+
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+}
 
 function generateCSV(data: ExportRequest['data']): string {
   const lines: string[] = [];

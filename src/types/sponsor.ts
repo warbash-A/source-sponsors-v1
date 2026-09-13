@@ -3,6 +3,10 @@ export interface EventDetails {
   type: string;
   industry: string;
   location: string;
+  /** Who the outreach emails are signed by. */
+  senderName?: string;
+  /** The company the sender represents. */
+  senderOrganization?: string;
   sources?: ('eventbrite' | 'meetup')[];
   eventCount?: number;
 }

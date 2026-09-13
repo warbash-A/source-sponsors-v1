@@ -322,8 +322,8 @@ export function useSponsorWorkflow() {
             eventCount: s.events.length,
           })),
           eventName: eventDetails?.name || 'Your Event',
-          senderName: 'Your Name',
-          senderOrganization: eventDetails?.name,
+          senderName: eventDetails?.senderName?.trim() || 'Your Name',
+          senderOrganization: eventDetails?.senderOrganization?.trim() || undefined,
           template: 'partnership',
         }
       });
@@ -350,7 +350,12 @@ export function useSponsorWorkflow() {
         sponsorName: sponsor.name,
         subject: `Partnership Opportunity: ${eventDetails?.name} - ${sponsor.name}`,
         subjectVariations: [],
-        body: generateFallbackEmail(sponsor, eventDetails?.name || 'Your Event'),
+        body: generateFallbackEmail(
+          sponsor,
+          eventDetails?.name || 'Your Event',
+          eventDetails?.senderName?.trim() || 'Your Name',
+          eventDetails?.senderOrganization?.trim() || undefined,
+        ),
         generatedWith: 'template' as const,
       }));
       setEmails(fallbackEmails);
@@ -371,7 +376,7 @@ export function useSponsorWorkflow() {
     try {
       const { data, error } = await supabase.functions.invoke('export-data', {
         body: {
-          format: format === 'excel' ? 'csv' : format,
+          format,
           data: {
             events: [...eventbriteEvents, ...meetupEvents].filter(e => selectedEventIds.includes(e.id)),
             sponsors,
@@ -383,8 +388,12 @@ export function useSponsorWorkflow() {
 
       if (error) throw error;
 
-      // Download the file
-      const blob = new Blob([data.content], { type: data.contentType });
+      // Download the file (spreadsheets come back base64-encoded)
+      const payload =
+        data.encoding === 'base64'
+          ? Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))
+          : data.content;
+      const blob = new Blob([payload], { type: data.contentType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -452,7 +461,13 @@ export function useSponsorWorkflow() {
 }
 
 
-function generateFallbackEmail(sponsor: EnrichedSponsor, eventName: string): string {
+function generateFallbackEmail(
+  sponsor: EnrichedSponsor,
+  eventName: string,
+  senderName = 'Your Name',
+  senderOrganization?: string,
+): string {
+  const from = senderOrganization ? `${senderName}, ${senderOrganization}` : senderName;
   return `Dear ${sponsor.name} Team,
 
 I hope this message finds you well. I'm reaching out regarding a potential partnership opportunity for ${eventName}.
@@ -464,5 +479,5 @@ Our event offers premium brand visibility and access to qualified attendees in o
 Would you be available for a brief call to discuss further?
 
 Best regards,
-[Your Name]`;
+${from}`;
 }
