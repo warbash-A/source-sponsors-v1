@@ -232,21 +232,25 @@ async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
     candidates.push(`https://${origin}/${slug}/`);
   }
 
-  for (const url of candidates) {
-    if (pages.length >= 3) break;
-    if (tried.has(url)) continue;
+  // Probe candidates in parallel — sequential probing exceeds the function time budget.
+  const unique = candidates.filter((url) => {
+    if (tried.has(url)) return false;
     tried.add(url);
+    return true;
+  }).slice(0, 10);
 
-    const content = await readPage(url, 30000);
-    if (!content) { console.log('Candidate unreadable:', url); continue; }
-    if (isNotFound(content)) { console.log('Candidate 404:', url); continue; }
+  const probed = await Promise.all(
+    unique.map(async (url) => {
+      const content = await readPage(url, 20000);
+      if (!content) return null;
+      if (isNotFound(content)) return null;
+      console.log('Sponsor page found:', url);
+      return { url, content } as Page;
+    }),
+  );
 
-    console.log('Sponsor page found:', url);
-    // Put dedicated sponsor pages first — they drive the extraction.
-    pages.unshift({ url, content });
-  }
-
-  return pages;
+  // Dedicated sponsor pages come first — they drive the extraction.
+  return [...probed.filter((p): p is Page => p !== null).slice(0, 2), ...pages];
 }
 
 function isNotFound(content: string): boolean {
