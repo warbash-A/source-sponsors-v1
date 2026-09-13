@@ -376,7 +376,7 @@ export function useSponsorWorkflow() {
     try {
       const { data, error } = await supabase.functions.invoke('export-data', {
         body: {
-          format: format === 'excel' ? 'csv' : format,
+          format,
           data: {
             events: [...eventbriteEvents, ...meetupEvents].filter(e => selectedEventIds.includes(e.id)),
             sponsors,
