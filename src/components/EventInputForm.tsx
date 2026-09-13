@@ -45,18 +45,21 @@ const industries = [
   "Non-Profit",
 ];
 
-export function EventInputForm({ onSubmit, isLoading }: EventInputFormProps) {
+export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInputFormProps) {
   const [formData, setFormData] = useState<EventDetails>({
-    name: "",
-    type: "",
-    industry: "",
-    location: "",
-    senderName: "",
-    senderOrganization: "",
+    name: initialValues?.name ?? "",
+    type: initialValues?.type ?? "",
+    industry: initialValues?.industry ?? "",
+    location: initialValues?.location ?? "",
+    senderName: initialValues?.senderName ?? "",
+    senderOrganization: initialValues?.senderOrganization ?? "",
   });
 
-  const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(['eventbrite', 'meetup']);
-  const [eventCount, setEventCount] = useState<number>(10);
+  const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(
+    initialValues?.sources?.length ? initialValues.sources : ['eventbrite', 'meetup']
+  );
+  const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
+
 
   const handleChange = (field: keyof EventDetails, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
