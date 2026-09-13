@@ -109,7 +109,12 @@ const Index = () => {
                   showEventbrite={eventDetails?.sources?.includes('eventbrite') ?? true}
                   showMeetup={eventDetails?.sources?.includes('meetup') ?? false}
                 />
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex justify-between gap-3">
+                  <Button variant="outline" onClick={handleGoBack}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+
                   <Button
                     onClick={handleProceedToSponsors}
                     disabled={selectedEventIds.length === 0 || isLoadingEventbrite || isLoadingMeetup || isLoading}
