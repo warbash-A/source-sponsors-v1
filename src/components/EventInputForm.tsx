@@ -217,6 +217,12 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
         {sources.length === 0 && (
           <p className="text-xs text-muted-foreground">Select at least one source</p>
         )}
+        {sources.includes('eventbrite') && (
+          <p className="text-xs text-muted-foreground">
+            Eventbrite no longer allows searching public events, so it only returns events from your
+            own Eventbrite account. Meetup covers public events.
+          </p>
+        )}
       </div>
 
       <div className="space-y-3">
