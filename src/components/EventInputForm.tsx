@@ -210,7 +210,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
               onCheckedChange={() => handleSourceToggle('meetup')}
             />
             <Label htmlFor="source-meetup" className="text-sm cursor-pointer">
-              Meetup
+              Meetup <span className="text-muted-foreground">(public events)</span>
             </Label>
           </div>
         </div>
