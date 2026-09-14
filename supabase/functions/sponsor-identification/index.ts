@@ -295,7 +295,13 @@ function collectLogoUrls(pages: Page[]): string[] {
   const urls: string[] = [];
   const seen = new Set<string>();
   for (const page of pages) {
-    for (const match of page.content.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
+    // Logos usually sit under a "Sponsors" / "Our partners" heading — start there
+    // so decorative images higher up don't fill the budget.
+    const headings = [...page.content.matchAll(/^#{1,4}[^\n]*(sponsor|partner|supporter|exhibitor)[^\n]*$/gim)];
+    const start = headings.length > 0 ? (headings[headings.length - 1].index ?? 0) : 0;
+    const section = page.content.slice(start);
+    const scope = /!\[[^\]]*\]\(https?:/.test(section) ? section : page.content;
+    for (const match of scope.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
       const [, alt, raw] = match;
       if (LOGO_SKIP.test(alt) || LOGO_SKIP.test(raw)) continue;
       // Wix/Squarespace style transforms: keep the original asset.
