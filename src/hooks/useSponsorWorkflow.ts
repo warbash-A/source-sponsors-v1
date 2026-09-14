@@ -18,6 +18,8 @@ interface PersistedWorkflow {
   selectedEventIds: string[];
   sponsors: EnrichedSponsor[];
   currentStep: number;
+  researchMode?: 'mine' | 'similar';
+  searchQueries?: string[];
 }
 
 const STORAGE_KEY = 'sponsorscout_workflow';
@@ -28,6 +30,8 @@ const STORAGE_DEFAULTS: PersistedWorkflow = {
   selectedEventIds: [],
   sponsors: [],
   currentStep: 0,
+  researchMode: 'mine',
+  searchQueries: [],
 };
 
 function readFromStorage(): PersistedWorkflow {
@@ -39,8 +43,6 @@ function readFromStorage(): PersistedWorkflow {
       return STORAGE_DEFAULTS;
     }
     return {
-      // eventDetails may legitimately be null (not yet submitted); the check below
-      // falls through to STORAGE_DEFAULTS.eventDetails (also null) in that case.
       eventDetails: typeof parsed.eventDetails === 'object' && parsed.eventDetails !== null &&
         typeof parsed.eventDetails.name === 'string' &&
         typeof parsed.eventDetails.type === 'string' &&
@@ -60,6 +62,10 @@ function readFromStorage(): PersistedWorkflow {
       currentStep: typeof parsed.currentStep === 'number' && Number.isFinite(parsed.currentStep)
         ? Math.max(0, Math.min(initialSteps.length - 1, Math.round(parsed.currentStep)))
         : STORAGE_DEFAULTS.currentStep,
+      researchMode: parsed.researchMode === 'similar' ? 'similar' : 'mine',
+      searchQueries: Array.isArray(parsed.searchQueries)
+        ? parsed.searchQueries
+        : STORAGE_DEFAULTS.searchQueries,
     };
   } catch {
     return STORAGE_DEFAULTS;
@@ -103,20 +109,19 @@ export function useSponsorWorkflow() {
   const [eventDetails, setEventDetails] = useState<EventDetails | null>(stored.eventDetails);
   const [events, setEvents] = useState<DiscoveredEvent[]>(stored.events);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
-  // Keep a separate isLoading for downstream steps (sponsors, emails, export)
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>(stored.selectedEventIds);
   const [sponsors, setSponsors] = useState<EnrichedSponsor[]>(stored.sponsors);
   const [emails, setEmails] = useState<EmailDraft[]>([]);
   const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
   const [completedExports, setCompletedExports] = useState<ExportFormat[]>([]);
-  // Highest step the user has reached — lets them navigate back and forward again
   const [maxStepReached, setMaxStepReached] = useState<number>(stored.currentStep);
+  const [researchMode, setResearchMode] = useState<'mine' | 'similar'>(stored.researchMode ?? 'mine');
+  const [searchQueries, setSearchQueries] = useState<string[]>(stored.searchQueries ?? []);
 
   useEffect(() => {
     setMaxStepReached((prev) => (currentStep > prev ? currentStep : prev));
   }, [currentStep]);
-
 
   const updateStepStatus = useCallback((stepId: number, status: WorkflowStep['status']) => {
     setSteps((prev) =>
@@ -124,60 +129,155 @@ export function useSponsorWorkflow() {
     );
   }, []);
 
-  // Persist workflow state to localStorage on every relevant change.
-  // Single effect (not one per slice) to avoid read-modify-write races
-  // when multiple slices update in the same render cycle (React 18 batching).
   useEffect(() => {
-    writeToStorage({ eventDetails, events, selectedEventIds, sponsors, currentStep });
-  }, [eventDetails, events, selectedEventIds, sponsors, currentStep]);
+    writeToStorage({ eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries });
+  }, [eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries]);
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
     setEventDetails(details);
     setEvents([]);
     setSelectedEventIds([]);
+    setSearchQueries([]);
+    setResearchMode(details.researchMode ?? 'mine');
     updateStepStatus(1, "complete");
     updateStepStatus(2, "active");
     setCurrentStep(1);
     setIsLoadingEvents(true);
 
-    const keywords = `${details.name} ${details.industry} ${details.type}`;
+    const mode = details.researchMode ?? 'mine';
+    const eventCount = details.eventCount ?? 10;
 
     try {
-      const { data, error } = await supabase.functions.invoke('meetup-discovery', {
-        body: { keywords, location: details.location },
-      });
+      let queries: string[] = [];
 
-      if (error) throw error;
+      if (mode === 'similar') {
+        const { data: queryData, error: queryError } = await supabase.functions.invoke('similar-event-queries', {
+          body: {
+            name: details.name,
+            type: details.type,
+            industry: details.industry,
+            location: details.location,
+            description: details.description,
+            focusTags: details.focusTags,
+          },
+        });
 
-      const payload = data ?? {};
-      const found: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        date: e.date,
-        location: e.location,
-        url: e.url,
-        source: 'meetup' as const,
-        sponsorCount: e.sponsorCount,
-      }));
+        if (queryError) throw queryError;
+        queries = (queryData?.queries ?? []).filter((q: unknown) => typeof q === 'string');
+        setSearchQueries(queries);
+
+        if (queries.length === 0) {
+          setEvents([]);
+          updateStepStatus(2, "complete");
+          toast.warning('Could not generate similar-event queries. Try adding a description or focus tags.');
+          setIsLoadingEvents(false);
+          return;
+        }
+      } else {
+        queries = [`${details.name} ${details.industry} ${details.type}`];
+        setSearchQueries(queries);
+      }
+
+      const seen = new Set<string>();
+      const found: DiscoveredEvent[] = [];
+      let lastMessage: string | undefined;
+
+      for (const query of queries) {
+        if (found.length >= eventCount) break;
+
+        const { data, error } = await supabase.functions.invoke('meetup-discovery', {
+          body: {
+            keywords: query,
+            location: details.location,
+            eventCount: Math.min(eventCount - found.length, 50),
+          },
+        });
+
+        if (error) {
+          console.error('Meetup discovery error for query:', query, error);
+          continue;
+        }
+
+        const payload = data ?? {};
+        lastMessage = payload.message;
+
+        for (const e of payload.events ?? []) {
+          const url = (e.url ?? '').trim();
+          const name = (e.name ?? '').trim();
+          if (!name || !url.includes('meetup.com') || seen.has(url)) continue;
+          seen.add(url);
+          found.push({
+            id: crypto.randomUUID(),
+            name,
+            url,
+            date: e.date?.trim() || 'TBD',
+            location: e.location?.trim() || details.location || 'See event page',
+            source: 'meetup' as const,
+            query: mode === 'similar' ? query : undefined,
+          });
+          if (found.length >= eventCount) break;
+        }
+      }
+
       setEvents(found);
-
       updateStepStatus(2, "complete");
+
       if (found.length > 0) {
         toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
       } else {
         toast.warning(
-          payload.message ?? 'No events found. Try broader keywords or a different location.'
+          lastMessage ?? 'No events found. Try broader keywords, a different location, or paste event URLs directly.'
         );
       }
     } catch (err) {
       console.error('Event discovery error:', err);
       setEvents([]);
       updateStepStatus(2, "complete");
-      toast.error('Could not reach Meetup — no results.');
+      toast.error('Could not reach event discovery. Try again in a moment.');
     } finally {
       setIsLoadingEvents(false);
     }
   }, [updateStepStatus]);
+
+  const handleAddEventFromUrl = useCallback(async (url: string) => {
+    setIsLoadingEvents(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('event-from-url', {
+        body: { url },
+      });
+
+      if (error) throw error;
+
+      const raw = data?.event;
+      if (!raw) {
+        toast.warning(data?.message ?? 'Could not read that event URL.');
+        return;
+      }
+
+      const event: DiscoveredEvent = {
+        id: crypto.randomUUID(),
+        name: raw.name,
+        url: raw.url,
+        date: raw.date,
+        location: raw.location,
+        source: 'manual',
+      };
+
+      setEvents((prev) => {
+        if (prev.some((e) => e.url === event.url)) {
+          toast.info('That event is already in your list.');
+          return prev;
+        }
+        return [...prev, event];
+      });
+      toast.success(`Added "${event.name}"`);
+    } catch (err) {
+      console.error('Add event from URL error:', err);
+      toast.error('Could not add event from URL.');
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  }, []);
 
   const handleToggleEvent = useCallback((eventId: string) => {
     setSelectedEventIds((prev) =>
@@ -197,7 +297,6 @@ export function useSponsorWorkflow() {
     );
 
     try {
-      // Step 1: Identify sponsors
       const { data: sponsorData, error: sponsorError } = await supabase.functions.invoke('sponsor-identification', {
         body: { events: selectedEvents }
       });
@@ -217,7 +316,6 @@ export function useSponsorWorkflow() {
         return;
       }
 
-      // Step 2: Enrich contacts
       const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('contact-enrichment', {
         body: { sponsors: identified }
       });
@@ -237,6 +335,7 @@ export function useSponsorWorkflow() {
         linkedinUrl: s.linkedinUrl,
         enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' :
                          s.enrichmentStatus === 'partial' ? 'partial' : 'failed',
+        eventCount: s.eventCount ?? (s.eventIds?.length ?? 1),
       }));
 
       setSponsors(enrichedSponsors);
@@ -340,7 +439,6 @@ export function useSponsorWorkflow() {
 
       if (error) throw error;
 
-      // Download the file (spreadsheets come back base64-encoded)
       const payload =
         data.encoding === 'base64'
           ? Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))
@@ -385,9 +483,10 @@ export function useSponsorWorkflow() {
     setExportingFormat(null);
     setCompletedExports([]);
     setMaxStepReached(0);
+    setResearchMode('mine');
+    setSearchQueries([]);
   }, []);
 
-  // Navigate to any step already reached, without losing data
   const goToStep = useCallback((step: number) => {
     if (step < 0 || step > maxStepReached) return;
     setCurrentStep(step);
@@ -410,7 +509,6 @@ export function useSponsorWorkflow() {
 
   return {
     currentStep,
-
     steps,
     eventDetails,
     events,
@@ -421,7 +519,10 @@ export function useSponsorWorkflow() {
     emails,
     exportingFormat,
     completedExports,
+    researchMode,
+    searchQueries,
     handleEventSubmit,
+    handleAddEventFromUrl,
     handleToggleEvent,
     handleProceedToSponsors,
     handleGenerateEmails,
@@ -431,10 +532,8 @@ export function useSponsorWorkflow() {
     maxStepReached,
     goToStep,
     handleGoBack,
-
   };
 }
-
 
 function generateFallbackEmail(
   sponsor: EnrichedSponsor,

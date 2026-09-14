@@ -8,6 +8,12 @@ export interface EventDetails {
   /** The company the sender represents. */
   senderOrganization?: string;
   eventCount?: number;
+  /** Which research mode this workflow is running in. */
+  researchMode?: 'mine' | 'similar';
+  /** Free-form description of the event and its audience. Used to find similar events. */
+  description?: string;
+  /** Tags that describe complementary event types the user wants to discover. */
+  focusTags?: string[];
 }
 
 export interface DiscoveredEvent {
@@ -16,8 +22,10 @@ export interface DiscoveredEvent {
   date: string;
   location: string;
   url: string;
-  source: 'meetup';
+  source: 'meetup' | 'manual';
   sponsorCount?: number;
+  /** The search query that produced this event, when discovered automatically. */
+  query?: string;
 }
 
 export interface Sponsor {
@@ -43,6 +51,8 @@ export interface EnrichedSponsor extends Sponsor {
   sourceUrl?: string;
   linkedinUrl?: string;
   enrichmentStatus: 'pending' | 'processing' | 'complete' | 'partial' | 'failed';
+  /** Number of selected events this sponsor appears in. */
+  eventCount?: number;
 }
 
 export interface EmailDraft {

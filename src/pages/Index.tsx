@@ -21,7 +21,10 @@ const Index = () => {
     emails,
     exportingFormat,
     completedExports,
+    researchMode,
+    searchQueries,
     handleEventSubmit,
+    handleAddEventFromUrl,
     handleToggleEvent,
     handleProceedToSponsors,
     handleGenerateEmails,
@@ -33,6 +36,7 @@ const Index = () => {
     handleGoBack,
   } = useSponsorWorkflow();
 
+  const similarMode = researchMode === 'similar';
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,7 +77,6 @@ const Index = () => {
             maxStepReached={maxStepReached}
             onStepClick={goToStep}
           />
-
         </div>
 
         {/* Step Content */}
@@ -86,7 +89,9 @@ const Index = () => {
                   Enter Your Event Details
                 </h2>
                 <p className="text-muted-foreground mt-1">
-                  Tell us about your event to find similar conferences and their sponsors
+                  {similarMode
+                    ? "Tell us about your event to find complementary events and their sponsors"
+                    : "Tell us about your event to find similar conferences and their sponsors"}
                 </p>
               </div>
               <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEvents} initialValues={eventDetails} />
@@ -102,6 +107,9 @@ const Index = () => {
                   selectedEvents={selectedEventIds}
                   onToggleEvent={handleToggleEvent}
                   isLoading={isLoadingEvents}
+                  researchMode={researchMode}
+                  searchQueries={searchQueries}
+                  onAddEventFromUrl={handleAddEventFromUrl}
                 />
                 <div className="mt-6 flex justify-between gap-3">
                   <Button variant="outline" onClick={handleGoBack}>
@@ -195,7 +203,6 @@ const Index = () => {
                 </Button>
               </div>
             </div>
-
           )}
         </div>
       </main>
