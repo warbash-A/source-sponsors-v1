@@ -107,11 +107,9 @@ serve(async (req) => {
           'You extract real, specific events (conferences, summits, meetups, hackathons) from the markdown of a web search results page.',
           `Return at most ${eventCount} events that genuinely match the topic: "${keywords}".`,
           location ? `Prefer events held in or near ${location}. Also allow major well-known events elsewhere in the same industry.` : '',
-          channel === 'luma'
-            ? 'Only include links on lu.ma that point to a specific event or a city/community calendar.'
-            : channel === 'directory'
-              ? 'Results come from conference directories; extract the individual conferences they list, not the directory homepage itself.'
-              : 'Only include pages that are the official website of a specific event (its homepage, sponsors page or registration page).',
+          channel === 'directory'
+            ? 'Results include conference round-ups and directories; extract the individual named conferences mentioned in the result titles and snippets, never the directory or round-up page itself.'
+            : 'Only include pages that are the official website of a specific event (its homepage, sponsors page or registration page).',
           'For each event give: name (the event title, not the page title boilerplate), url (the real destination URL, never a duckduckgo.com link), date (year or dates if shown, otherwise empty string), location (city, or "Online", otherwise empty string).',
           'Reject: search engine chrome, ads, login pages, news articles about an industry, listicles without a named event, vendor marketing pages, ticket-reseller aggregator search pages.',
           'Never invent an event or a URL. If there are no genuine matching events, return an empty list.',
