@@ -18,10 +18,8 @@ src/
 │   ├── EmailPreview.tsx            # Step 4: generated email drafts
 │   ├── ExportPanel.tsx             # Step 5: CSV/Excel/email-template export
 │   ├── WorkflowStepper.tsx         # Progress indicator across steps
-│   └── DataSourceIndicator.tsx     # Badge: live vs sample data
 supabase/functions/
-├── event-discovery/                # Eventbrite API → JinaAI scraping → sample data fallback
-├── meetup-discovery/               # Meetup search via JinaAI scraping
+├── meetup-discovery/               # Meetup search via JinaAI scraping (only discovery source)
 ├── sponsor-identification/         # Extract sponsors + tiers from event pages
 ├── contact-enrichment/             # Domain extraction, email variants, LinkedIn URLs
 ├── email-generation/               # AI email drafting via Lovable AI Gateway
@@ -32,22 +30,18 @@ supabase/functions/
 
 Each step feeds into the next:
 
-1. **Event Input** → `EventDetails` (name, type, industry, location, sources)
-2. **Event Discovery** → `DiscoveredEvent[]` — calls `event-discovery` and optionally `meetup-discovery`
+1. **Event Input** → `EventDetails` (name, type, industry, location)
+2. **Event Discovery** → `DiscoveredEvent[]` — calls `meetup-discovery`
 3. **Sponsor Identification + Enrichment** → `EnrichedSponsor[]` — calls `sponsor-identification` then `contact-enrichment`
 4. **Email Generation** → `EmailDraft[]` — calls `email-generation` (AI or template fallback)
 5. **Export** → downloadable files — calls `export-data`
 
 ## Edge Function Details
 
-### event-discovery
-- **Priority**: Eventbrite API (needs `EVENTBRITE_API_KEY`) → JinaAI Reader (free, no key) → sample data
-- **Input**: keywords + location from EventDetails
-- **Output**: array of `DiscoveredEvent` with source field
-
 ### meetup-discovery
-- Uses JinaAI Reader to scrape Meetup search results
-- Triggered when user selects "meetup" in event sources
+- The only event discovery source; uses JinaAI Reader + AI extraction on Meetup search results
+- **Input**: keywords + location from EventDetails
+- **Output**: array of `DiscoveredEvent` with `source: 'meetup'`
 
 ### sponsor-identification
 - Attempts JinaAI scraping of event URLs, falls back to sample sponsors
@@ -87,7 +81,7 @@ Each step feeds into the next:
 
 ## Known Limitations
 
-- **Eventbrite API key** not configured — falls back to JinaAI/sample data
+- **Meetup is the only event source** — Eventbrite was removed (its public search API was discontinued)
 - **Meetup integration** uses scraping only (no official API)
 - **No persistence** — refreshing the page loses all workflow state
 - **No authentication** — single-user, no saved searches

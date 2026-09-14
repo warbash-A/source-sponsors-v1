@@ -7,7 +7,6 @@ export interface EventDetails {
   senderName?: string;
   /** The company the sender represents. */
   senderOrganization?: string;
-  sources?: ('eventbrite' | 'meetup')[];
   eventCount?: number;
 }
 
@@ -17,7 +16,7 @@ export interface DiscoveredEvent {
   date: string;
   location: string;
   url: string;
-  source: 'eventbrite' | 'apify' | 'sample' | 'meetup';
+  source: 'meetup';
   sponsorCount?: number;
 }
 

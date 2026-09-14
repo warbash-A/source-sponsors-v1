@@ -14,8 +14,7 @@ import type {
 
 interface PersistedWorkflow {
   eventDetails: EventDetails | null;
-  eventbriteEvents: DiscoveredEvent[];
-  meetupEvents: DiscoveredEvent[];
+  events: DiscoveredEvent[];
   selectedEventIds: string[];
   sponsors: EnrichedSponsor[];
   currentStep: number;
@@ -25,8 +24,7 @@ const STORAGE_KEY = 'sponsorscout_workflow';
 
 const STORAGE_DEFAULTS: PersistedWorkflow = {
   eventDetails: null,
-  eventbriteEvents: [],
-  meetupEvents: [],
+  events: [],
   selectedEventIds: [],
   sponsors: [],
   currentStep: 0,
@@ -50,12 +48,9 @@ function readFromStorage(): PersistedWorkflow {
         typeof parsed.eventDetails.location === 'string'
         ? parsed.eventDetails as EventDetails
         : STORAGE_DEFAULTS.eventDetails,
-      eventbriteEvents: Array.isArray(parsed.eventbriteEvents)
-        ? parsed.eventbriteEvents
-        : STORAGE_DEFAULTS.eventbriteEvents,
-      meetupEvents: Array.isArray(parsed.meetupEvents)
-        ? parsed.meetupEvents
-        : STORAGE_DEFAULTS.meetupEvents,
+      events: Array.isArray(parsed.events)
+        ? parsed.events
+        : STORAGE_DEFAULTS.events,
       selectedEventIds: Array.isArray(parsed.selectedEventIds)
         ? parsed.selectedEventIds
         : STORAGE_DEFAULTS.selectedEventIds,
@@ -106,10 +101,8 @@ export function useSponsorWorkflow() {
   const [currentStep, setCurrentStep] = useState<number>(stored.currentStep);
   const [steps, setSteps] = useState<WorkflowStep[]>(() => deriveSteps(stored.currentStep));
   const [eventDetails, setEventDetails] = useState<EventDetails | null>(stored.eventDetails);
-  const [eventbriteEvents, setEventbriteEvents] = useState<DiscoveredEvent[]>(stored.eventbriteEvents);
-  const [meetupEvents, setMeetupEvents] = useState<DiscoveredEvent[]>(stored.meetupEvents);
-  const [isLoadingEventbrite, setIsLoadingEventbrite] = useState(false);
-  const [isLoadingMeetup, setIsLoadingMeetup] = useState(false);
+  const [events, setEvents] = useState<DiscoveredEvent[]>(stored.events);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   // Keep a separate isLoading for downstream steps (sponsors, emails, export)
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>(stored.selectedEventIds);
@@ -135,102 +128,54 @@ export function useSponsorWorkflow() {
   // Single effect (not one per slice) to avoid read-modify-write races
   // when multiple slices update in the same render cycle (React 18 batching).
   useEffect(() => {
-    writeToStorage({ eventDetails, eventbriteEvents, meetupEvents, selectedEventIds, sponsors, currentStep });
-  }, [eventDetails, eventbriteEvents, meetupEvents, selectedEventIds, sponsors, currentStep]);
+    writeToStorage({ eventDetails, events, selectedEventIds, sponsors, currentStep });
+  }, [eventDetails, events, selectedEventIds, sponsors, currentStep]);
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
     setEventDetails(details);
-    setEventbriteEvents([]);
-    setMeetupEvents([]);
+    setEvents([]);
     setSelectedEventIds([]);
     updateStepStatus(1, "complete");
     updateStepStatus(2, "active");
     setCurrentStep(1);
-
-    const wantsEventbrite = details.sources?.includes('eventbrite') ?? true;
-    const wantsMeetup = details.sources?.includes('meetup') ?? false;
-
-    if (wantsEventbrite) setIsLoadingEventbrite(true);
-    if (wantsMeetup) setIsLoadingMeetup(true);
+    setIsLoadingEvents(true);
 
     const keywords = `${details.name} ${details.industry} ${details.type}`;
 
     try {
-      const [ebrResult, meetupResult] = await Promise.allSettled([
-        wantsEventbrite
-          ? supabase.functions.invoke('event-discovery', {
-              body: { keywords, location: details.location },
-            })
-          : Promise.resolve({ data: { events: [] }, error: null }),
-        wantsMeetup
-          ? supabase.functions.invoke('meetup-discovery', {
-              body: { keywords, location: details.location },
-            })
-          : Promise.resolve({ data: { events: [] }, error: null }),
-      ]);
+      const { data, error } = await supabase.functions.invoke('meetup-discovery', {
+        body: { keywords, location: details.location },
+      });
 
-      let totalFound = 0;
+      if (error) throw error;
 
-      // --- Eventbrite result ---
-      // Use inline narrowing (not a pre-evaluated boolean) so TypeScript narrows
-      // ebrResult to PromiseFulfilledResult inside the if-block.
-      if (wantsEventbrite) {
-        if (ebrResult.status === 'fulfilled' && !ebrResult.value.error) {
-          const payload = ebrResult.value.data ?? {};
-          const events: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
-            id: e.id,
-            name: e.name,
-            date: e.date,
-            location: e.location,
-            url: e.url,
-            source: 'eventbrite' as const,
-            sponsorCount: e.sponsorCount,
-          }));
-          setEventbriteEvents(events);
-          totalFound += events.length;
-          if (events.length === 0 && payload.message) {
-            toast.warning(payload.message);
-          }
-        } else {
-          setEventbriteEvents([]);
-          toast.error('Eventbrite search failed — no Eventbrite results.');
-        }
-      }
-
-      // --- Meetup result ---
-      // Same pattern: inline narrowing for TypeScript to recognise .value
-      if (wantsMeetup) {
-        if (meetupResult.status === 'fulfilled' && !meetupResult.value.error) {
-          const payload = meetupResult.value.data ?? {};
-          const events: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
-            id: e.id,
-            name: e.name,
-            date: e.date,
-            location: e.location,
-            url: e.url,
-            source: 'meetup' as const,
-            sponsorCount: e.sponsorCount,
-          }));
-          setMeetupEvents(events);
-          totalFound += events.length;
-          if (events.length === 0 && payload.message) {
-            toast.warning(payload.message);
-          }
-        } else {
-          setMeetupEvents([]);
-          toast.error('Could not reach Meetup — no Meetup results.');
-        }
-      }
+      const payload = data ?? {};
+      const found: DiscoveredEvent[] = (payload.events ?? []).map((e: any) => ({
+        id: e.id,
+        name: e.name,
+        date: e.date,
+        location: e.location,
+        url: e.url,
+        source: 'meetup' as const,
+        sponsorCount: e.sponsorCount,
+      }));
+      setEvents(found);
 
       updateStepStatus(2, "complete");
-      if (totalFound > 0) {
-        toast.success(`Found ${totalFound} event${totalFound === 1 ? '' : 's'}`);
+      if (found.length > 0) {
+        toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
       } else {
-        toast.warning('No events found. Try broader keywords or a different location.');
+        toast.warning(
+          payload.message ?? 'No events found. Try broader keywords or a different location.'
+        );
       }
+    } catch (err) {
+      console.error('Event discovery error:', err);
+      setEvents([]);
+      updateStepStatus(2, "complete");
+      toast.error('Could not reach Meetup — no results.');
     } finally {
-      setIsLoadingEventbrite(false);
-      setIsLoadingMeetup(false);
+      setIsLoadingEvents(false);
     }
   }, [updateStepStatus]);
 
@@ -247,7 +192,7 @@ export function useSponsorWorkflow() {
     updateStepStatus(3, "active");
     setCurrentStep(2);
 
-    const selectedEvents = [...eventbriteEvents, ...meetupEvents].filter((e) =>
+    const selectedEvents = events.filter((e) =>
       selectedEventIds.includes(e.id)
     );
 
@@ -308,7 +253,7 @@ export function useSponsorWorkflow() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedEventIds, eventbriteEvents, meetupEvents, updateStepStatus]);
+  }, [selectedEventIds, events, updateStepStatus]);
 
   const handleGenerateEmails = useCallback(async () => {
     setIsLoading(true);
@@ -385,7 +330,7 @@ export function useSponsorWorkflow() {
         body: {
           format,
           data: {
-            events: [...eventbriteEvents, ...meetupEvents].filter(e => selectedEventIds.includes(e.id)),
+            events: events.filter(e => selectedEventIds.includes(e.id)),
             sponsors,
             emails,
           },
@@ -424,17 +369,15 @@ export function useSponsorWorkflow() {
     } finally {
       setExportingFormat(null);
     }
-  }, [eventbriteEvents, meetupEvents, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
+  }, [events, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
 
   const resetWorkflow = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setCurrentStep(0);
     setSteps(initialSteps);
     setEventDetails(null);
-    setEventbriteEvents([]);
-    setMeetupEvents([]);
-    setIsLoadingEventbrite(false);
-    setIsLoadingMeetup(false);
+    setEvents([]);
+    setIsLoadingEvents(false);
     setIsLoading(false);
     setSelectedEventIds([]);
     setSponsors([]);
@@ -470,10 +413,8 @@ export function useSponsorWorkflow() {
 
     steps,
     eventDetails,
-    eventbriteEvents,
-    meetupEvents,
-    isLoadingEventbrite,
-    isLoadingMeetup,
+    events,
+    isLoadingEvents,
     isLoading,
     selectedEventIds,
     sponsors,

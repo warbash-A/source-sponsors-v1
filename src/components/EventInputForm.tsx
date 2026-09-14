@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapPin, Building2, Tag, Sparkles, User, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -55,20 +55,10 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     senderOrganization: initialValues?.senderOrganization ?? "",
   });
 
-  const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(
-    initialValues?.sources?.length ? initialValues.sources : ['meetup']
-  );
   const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
-
 
   const handleChange = (field: keyof EventDetails, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSourceToggle = (source: 'eventbrite' | 'meetup') => {
-    setSources((prev) =>
-      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
-    );
   };
 
   const isValid =
@@ -76,12 +66,11 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     formData.type &&
     formData.industry &&
     formData.location &&
-    formData.senderName?.trim() &&
-    sources.length > 0;
+    formData.senderName?.trim();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ ...formData, sources, eventCount });
+    onSubmit({ ...formData, eventCount });
   };
 
   return (
@@ -190,40 +179,10 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
 
       </div>
 
-      <div className="space-y-3">
-        <Label className="text-foreground text-sm font-medium">Search Sources</Label>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="source-eventbrite"
-              checked={sources.includes('eventbrite')}
-              onCheckedChange={() => handleSourceToggle('eventbrite')}
-            />
-            <Label htmlFor="source-eventbrite" className="text-sm cursor-pointer">
-              Eventbrite <span className="text-muted-foreground">(your account only)</span>
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="source-meetup"
-              checked={sources.includes('meetup')}
-              onCheckedChange={() => handleSourceToggle('meetup')}
-            />
-            <Label htmlFor="source-meetup" className="text-sm cursor-pointer">
-              Meetup <span className="text-muted-foreground">(public events)</span>
-            </Label>
-          </div>
-        </div>
-        {sources.length === 0 && (
-          <p className="text-xs text-muted-foreground">Select at least one source</p>
-        )}
-        {sources.includes('eventbrite') && (
-          <p className="text-xs text-muted-foreground">
-            Eventbrite no longer allows searching public events, so it only returns events from your
-            own Eventbrite account. Meetup covers public events.
-          </p>
-        )}
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Events are discovered from public Meetup listings.
+      </p>
+
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
