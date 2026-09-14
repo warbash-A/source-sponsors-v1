@@ -392,40 +392,79 @@ export function useSponsorWorkflow() {
       }
 
 
-      const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('contact-enrichment', {
-        body: { sponsors: identified }
-      });
-
-      if (enrichError) throw enrichError;
-
-      const enrichedSponsors: EnrichedSponsor[] = enrichedData.sponsors.map((s: any) => ({
+      // Show the sponsor list straight away; contact details fill in afterwards.
+      const baseSponsors: EnrichedSponsor[] = identified.map((s: any) => ({
         id: s.id,
         name: s.name,
         tier: s.tier,
         website: s.website,
-        domain: s.domain,
         events: s.eventNames?.length ? s.eventNames : (s.eventIds || []),
-        emails: s.emails || [],
-        emailDetails: s.emailDetails || [],
+        emails: [],
+        emailDetails: [],
         sourceUrl: s.sourceUrl,
-        linkedinUrl: s.linkedinUrl,
-        enrichmentStatus: s.enrichmentStatus === 'enriched' ? 'complete' :
-                         s.enrichmentStatus === 'partial' ? 'partial' : 'failed',
+        enrichmentStatus: 'processing',
         eventCount: s.eventCount ?? (s.eventIds?.length ?? 1),
       }));
 
-      setSponsors(enrichedSponsors);
+      setSponsors(baseSponsors);
       updateStepStatus(3, "complete");
+      setIsLoading(false);
       toast.success(
-        `Found ${enrichedSponsors.length} sponsor${enrichedSponsors.length === 1 ? '' : 's'}` +
+        `Found ${baseSponsors.length} sponsor${baseSponsors.length === 1 ? '' : 's'}` +
           (skipped.length > 0 ? ` — ${skipped.length} event page(s) listed none` : '')
       );
+
+      // Enrich in small batches so a slow or failing batch can't wipe the list.
+      const BATCH = 5;
+      for (let i = 0; i < identified.length; i += BATCH) {
+        const batch = identified.slice(i, i + BATCH);
+        try {
+          const { data: enrichedData, error: enrichError } = await supabase.functions.invoke(
+            'contact-enrichment',
+            { body: { sponsors: batch } },
+          );
+          if (enrichError) throw enrichError;
+
+          const byId = new Map<string, any>(
+            (enrichedData?.sponsors ?? []).map((s: any) => [s.id, s]),
+          );
+          setSponsors((prev) =>
+            prev.map((sponsor) => {
+              const s = byId.get(sponsor.id);
+              if (!s) return sponsor;
+              return {
+                ...sponsor,
+                website: s.website ?? sponsor.website,
+                domain: s.domain,
+                emails: s.emails || [],
+                emailDetails: s.emailDetails || [],
+                linkedinUrl: s.linkedinUrl,
+                enrichmentStatus:
+                  s.enrichmentStatus === 'enriched'
+                    ? 'complete'
+                    : s.enrichmentStatus === 'partial'
+                      ? 'partial'
+                      : 'failed',
+              };
+            }),
+          );
+        } catch (err) {
+          console.error('Contact enrichment batch error:', err);
+          const ids = new Set(batch.map((s: any) => s.id));
+          setSponsors((prev) =>
+            prev.map((sponsor) =>
+              ids.has(sponsor.id) && sponsor.enrichmentStatus === 'processing'
+                ? { ...sponsor, enrichmentStatus: 'failed' }
+                : sponsor,
+            ),
+          );
+        }
+      }
     } catch (error) {
       console.error('Sponsor identification error:', error);
       setSponsors([]);
       toast.error('Could not read sponsors from the selected events.');
       updateStepStatus(3, "complete");
-    } finally {
       setIsLoading(false);
     }
   }, [selectedEventIds, events, updateStepStatus]);
