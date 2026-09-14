@@ -119,6 +119,7 @@ export function useSponsorWorkflow() {
   const [maxStepReached, setMaxStepReached] = useState<number>(stored.currentStep);
   const [researchMode, setResearchMode] = useState<'mine' | 'similar'>(stored.researchMode ?? 'mine');
   const [searchQueries, setSearchQueries] = useState<string[]>(stored.searchQueries ?? []);
+  const [isPrescanning, setIsPrescanning] = useState(false);
 
   useEffect(() => {
     setMaxStepReached((prev) => (currentStep > prev ? currentStep : prev));
