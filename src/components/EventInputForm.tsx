@@ -200,7 +200,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
               onCheckedChange={() => handleSourceToggle('eventbrite')}
             />
             <Label htmlFor="source-eventbrite" className="text-sm cursor-pointer">
-              Eventbrite
+              Eventbrite <span className="text-muted-foreground">(your account only)</span>
             </Label>
           </div>
           <div className="flex items-center gap-2">
