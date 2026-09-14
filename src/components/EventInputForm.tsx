@@ -111,7 +111,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ ...formData, eventCount });
+    onSubmit({ ...formData, eventCount, sources: selectedSources });
   };
 
   const similarMode = formData.researchMode === "similar";
