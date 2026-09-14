@@ -192,7 +192,7 @@ export function useSponsorWorkflow() {
     updateStepStatus(3, "active");
     setCurrentStep(2);
 
-    const selectedEvents = [...eventbriteEvents, ...meetupEvents].filter((e) =>
+    const selectedEvents = events.filter((e) =>
       selectedEventIds.includes(e.id)
     );
 
@@ -253,7 +253,7 @@ export function useSponsorWorkflow() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedEventIds, eventbriteEvents, meetupEvents, updateStepStatus]);
+  }, [selectedEventIds, events, updateStepStatus]);
 
   const handleGenerateEmails = useCallback(async () => {
     setIsLoading(true);
@@ -330,7 +330,7 @@ export function useSponsorWorkflow() {
         body: {
           format,
           data: {
-            events: [...eventbriteEvents, ...meetupEvents].filter(e => selectedEventIds.includes(e.id)),
+            events: events.filter(e => selectedEventIds.includes(e.id)),
             sponsors,
             emails,
           },
@@ -369,17 +369,15 @@ export function useSponsorWorkflow() {
     } finally {
       setExportingFormat(null);
     }
-  }, [eventbriteEvents, meetupEvents, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
+  }, [events, selectedEventIds, sponsors, emails, eventDetails, completedExports, updateStepStatus]);
 
   const resetWorkflow = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setCurrentStep(0);
     setSteps(initialSteps);
     setEventDetails(null);
-    setEventbriteEvents([]);
-    setMeetupEvents([]);
-    setIsLoadingEventbrite(false);
-    setIsLoadingMeetup(false);
+    setEvents([]);
+    setIsLoadingEvents(false);
     setIsLoading(false);
     setSelectedEventIds([]);
     setSponsors([]);
@@ -415,10 +413,8 @@ export function useSponsorWorkflow() {
 
     steps,
     eventDetails,
-    eventbriteEvents,
-    meetupEvents,
-    isLoadingEventbrite,
-    isLoadingMeetup,
+    events,
+    isLoadingEvents,
     isLoading,
     selectedEventIds,
     sponsors,
