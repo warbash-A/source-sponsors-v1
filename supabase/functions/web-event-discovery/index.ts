@@ -105,9 +105,10 @@ serve(async (req) => {
       return json({ events: [], status: 'empty', message: 'No search keywords provided.' });
     }
 
-    const query = buildQuery(channel, keywords, location);
-    const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    console.log('Searching the web:', channel, query);
+    const searchUrl = channel === 'luma'
+      ? lumaUrl(keywords, location)
+      : `https://duckduckgo.com/html/?q=${encodeURIComponent(buildQuery(channel, keywords, location))}`;
+    console.log('Searching the web:', channel, searchUrl);
 
     const raw = await readPage(searchUrl, 45000);
     if (!raw) {
