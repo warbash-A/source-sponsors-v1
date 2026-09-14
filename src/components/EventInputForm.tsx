@@ -56,7 +56,23 @@ const focusTagOptions = [
   "Webinar",
 ];
 
+const sourceOptions: { value: EventSource; label: string; hint: string }[] = [
+  { value: "web", label: "Conference sites", hint: "Official event websites" },
+  { value: "directory", label: "Conference directories", hint: "Curated industry round-ups" },
+  { value: "meetup", label: "Meetup", hint: "Public community events" },
+];
+
 export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInputFormProps) {
+  const [selectedSources, setSelectedSources] = useState<EventSource[]>(
+    initialValues?.sources?.length ? initialValues.sources : ["web", "meetup"]
+  );
+
+  const toggleSource = (source: EventSource) => {
+    setSelectedSources((prev) =>
+      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
+    );
+  };
+
   const [formData, setFormData] = useState<EventDetails>({
     name: initialValues?.name ?? "",
     type: initialValues?.type ?? "",
