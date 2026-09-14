@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, json, generateId, readPage } from "../_shared/scrape.ts";
 import { aiExtract, AiGatewayError } from "../_shared/ai-extract.ts";
 
-type Channel = 'luma' | 'directory' | 'web';
+type Channel = 'directory' | 'web';
 
 interface DiscoveredEvent {
   id: string;
@@ -77,7 +77,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const keywords: string = (body.keywords ?? '').toString().trim();
     const location: string | undefined = body.location?.toString().trim() || undefined;
-    const channel: Channel = ['luma', 'directory', 'web'].includes(body.channel) ? body.channel : 'web';
+    const channel: Channel = ['directory', 'web'].includes(body.channel) ? body.channel : 'web';
     const eventCount: number = typeof body.eventCount === 'number' ? Math.min(body.eventCount, 25) : 10;
 
     if (!keywords) {
@@ -135,7 +135,6 @@ serve(async (req) => {
       const url = (e.url ?? '').trim();
       const name = (e.name ?? '').trim();
       if (!name || !url.startsWith('http') || url.includes('duckduckgo.com') || seen.has(url)) continue;
-      if (channel === 'luma' && !url.includes('lu.ma')) continue;
       seen.add(url);
       events.push({
         id: generateId(),
