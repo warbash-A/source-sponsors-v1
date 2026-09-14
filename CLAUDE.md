@@ -38,14 +38,10 @@ Each step feeds into the next:
 
 ## Edge Function Details
 
-### event-discovery
-- **Priority**: Eventbrite API (needs `EVENTBRITE_API_KEY`) → JinaAI Reader (free, no key) → sample data
-- **Input**: keywords + location from EventDetails
-- **Output**: array of `DiscoveredEvent` with source field
-
 ### meetup-discovery
-- Uses JinaAI Reader to scrape Meetup search results
-- Triggered when user selects "meetup" in event sources
+- The only event discovery source; uses JinaAI Reader + AI extraction on Meetup search results
+- **Input**: keywords + location from EventDetails
+- **Output**: array of `DiscoveredEvent` with `source: 'meetup'`
 
 ### sponsor-identification
 - Attempts JinaAI scraping of event URLs, falls back to sample sponsors
