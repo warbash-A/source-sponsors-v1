@@ -284,39 +284,101 @@ const LOGO_INSTRUCTIONS = [
   'tier must be "unknown" unless the ordering clearly indicates a tier; website must be an empty string.',
 ].join(' ');
 
-const LOGO_SKIP = /(favicon|sprite|arrow|icon|banner|instagram|youtube|linkedin|twitter|facebook|placeholder)/i;
+const LOGO_SKIP = /(favicon|sprite|arrow|icon|banner|instagram|youtube|linkedin|twitter|facebook|placeholder|avatar|headshot|profile)/i;
 
-/** Collects sponsor-logo image URLs from the scraped pages, normalised to their originals. */
-function collectLogoUrls(pages: Page[]): string[] {
-  const urls: string[] = [];
-  const seen = new Set<string>();
-  for (const page of pages) {
-    // Logos usually sit under a "Sponsors" / "Our partners" heading — start there
-    // so decorative images higher up don't fill the budget.
-    const headings = [...page.content.matchAll(/^#{1,4}[^\n]*(sponsor|partner|supporter|exhibitor)[^\n]*$/gim)];
-    const imageRe = /!\[[^\]]*\]\(https?:\/\//g;
-    let start = 0;
-    for (const heading of headings) {
-      const index = heading.index ?? 0;
-      const count = (page.content.slice(index).match(imageRe) ?? []).length;
-      if (count >= 5) start = index; // latest heading that still has a logo wall under it
-    }
-    const scope = page.content.slice(start);
-    for (const match of scope.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
-      const [, alt, raw] = match;
-      if (LOGO_SKIP.test(alt) || LOGO_SKIP.test(raw)) continue;
-      // Wix/Squarespace style transforms: keep the original asset.
-      const url = raw.replace(/\/v1\/(fill|crop|fit)\/[^?]*$/, '').replace(/[?#].*$/, '');
-      if (!/\.(png|jpe?g|webp|svg)$/i.test(url)) continue;
-      const key = url.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      urls.push(url);
-      if (urls.length >= 30) return urls;
+const MAX_LOGOS = 40;
+const LOGO_BATCH = 10;
+
+/** Reads the logo wall in small batches so one unreadable image can't lose the rest. */
+async function readLogosInBatches(
+  logos: string[],
+  eventName: string,
+): Promise<{ name: string; tier: string; website: string }[]> {
+  const out: { name: string; tier: string; website: string }[] = [];
+  for (let i = 0; i < logos.length; i += LOGO_BATCH) {
+    const batch = logos.slice(i, i + LOGO_BATCH);
+    try {
+      const res = await aiExtract<ExtractedSponsors>({
+        name: 'event_sponsors',
+        schema: SPONSORS_SCHEMA as unknown as Record<string, unknown>,
+        instructions: LOGO_INSTRUCTIONS,
+        content: `These images are the sponsor/partner logos shown on the page for the event "${eventName}". Name each sponsoring organisation you can read.`,
+        imageUrls: batch,
+      });
+      out.push(...(res.sponsors ?? []).filter((s) => isLikelyCompany(s.name)));
+    } catch (err) {
+      console.error('Logo batch failed', eventName, i, err instanceof Error ? err.message : err);
     }
   }
+  return out;
+}
+
+/** Normalises an image URL to a fetchable original, or null when it isn't a usable logo. */
+function normaliseImageUrl(raw: string, alt = ''): string | null {
+  if (LOGO_SKIP.test(alt) || LOGO_SKIP.test(raw)) return null;
+  // Wix/Squarespace style transforms: keep the original asset (avif/webp variants are rejected upstream).
+  const url = raw.replace(/\/v1\/(fill|crop|fit)\/[^?]*$/, '').replace(/[?#].*$/, '');
+  // SVG is not an accepted vision format.
+  if (!/\.(png|jpe?g|webp)$/i.test(url)) return null;
+  return url;
+}
+
+/**
+ * Collects sponsor-logo image URLs from the scraped pages. Markdown first; when a page
+ * yields few images (logo walls are often rendered as bare <img> tags the reader drops)
+ * the raw HTML is fetched and scanned too.
+ */
+async function collectLogoUrls(pages: Page[]): Promise<string[]> {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (raw: string, alt = '') => {
+    const url = normaliseImageUrl(raw, alt);
+    if (!url) return;
+    const key = url.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    urls.push(url);
+  };
+
+  for (const page of pages) {
+    for (const match of page.content.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
+      add(match[2], match[1]);
+      if (urls.length >= MAX_LOGOS) return urls;
+    }
+  }
+
+  if (urls.length < MAX_LOGOS && pages.length > 0) {
+    const html = await fetchHtml(pages[0].url);
+    if (html) {
+      for (const match of html.matchAll(/<img[^>]+>/gi)) {
+        const tag = match[0];
+        const src = tag.match(/(?:data-src|srcset|src)=["']([^"'\s]+)/i)?.[1];
+        const alt = tag.match(/alt=["']([^"']*)["']/i)?.[1] ?? '';
+        if (src && /^https?:\/\//i.test(src)) add(src, alt);
+        if (urls.length >= MAX_LOGOS) break;
+      }
+    }
+  }
+
   return urls;
 }
+
+/** Fetches a page's raw HTML directly (no reader) so lazy <img> markup is visible. */
+async function fetchHtml(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SponsorScout/1.0)' },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) return null;
+    return (await res.text()).substring(0, 400000);
+  } catch (err) {
+    console.log('Raw HTML fetch failed', url, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 
 /** Rejects obvious non-company strings the model may still return. */
 function isLikelyCompany(raw: string): boolean {
