@@ -121,7 +121,28 @@ serve(async (req) => {
         }
 
         console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
-        const found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
+        let found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
+
+        // Many sponsor pages show logos as images with no text. Read the logos directly.
+        if (found.length === 0) {
+          const logos = collectLogoUrls(pages);
+          if (logos.length > 0) {
+            console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
+            try {
+              const fromLogos = await aiExtract<ExtractedSponsors>({
+                name: 'event_sponsors',
+                schema: SPONSORS_SCHEMA as unknown as Record<string, unknown>,
+                instructions: LOGO_INSTRUCTIONS,
+                content: `These images are the sponsor/partner logos shown on the page for the event "${event.name}". Name each sponsoring organisation you can read.`,
+                imageUrls: logos,
+              });
+              found = (fromLogos.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
+              console.log(`Logo vision returned ${found.length} sponsors for ${event.name}`);
+            } catch (err) {
+              console.error('Logo vision failed', event.name, err);
+            }
+          }
+        }
         if (found.length === 0) {
           eventsWithoutSponsors.push(event.name);
           continue;
@@ -257,6 +278,48 @@ async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
 function isNotFound(content: string): boolean {
   const head = content.substring(0, 600).toLowerCase();
   return head.includes('error 404') || head.includes('page not found') || head.includes('404 not found');
+}
+
+const LOGO_INSTRUCTIONS = [
+  'You read company logos from sponsor walls and return the organisations they belong to.',
+  'For each image, return the company or organisation name written in or represented by the logo.',
+  'Skip images that are not company logos: decorative art, photos of people, banners, icons, arrows or the event\'s own branding.',
+  'If you cannot confidently read a logo, omit it. Never invent a sponsor.',
+  'tier must be "unknown" unless the ordering clearly indicates a tier; website must be an empty string.',
+].join(' ');
+
+const LOGO_SKIP = /(favicon|sprite|arrow|icon|banner|instagram|youtube|linkedin|twitter|facebook|placeholder)/i;
+
+/** Collects sponsor-logo image URLs from the scraped pages, normalised to their originals. */
+function collectLogoUrls(pages: Page[]): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const page of pages) {
+    // Logos usually sit under a "Sponsors" / "Our partners" heading — start there
+    // so decorative images higher up don't fill the budget.
+    const headings = [...page.content.matchAll(/^#{1,4}[^\n]*(sponsor|partner|supporter|exhibitor)[^\n]*$/gim)];
+    const imageRe = /!\[[^\]]*\]\(https?:\/\//g;
+    let start = 0;
+    for (const heading of headings) {
+      const index = heading.index ?? 0;
+      const count = (page.content.slice(index).match(imageRe) ?? []).length;
+      if (count >= 5) start = index; // latest heading that still has a logo wall under it
+    }
+    const scope = page.content.slice(start);
+    for (const match of scope.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
+      const [, alt, raw] = match;
+      if (LOGO_SKIP.test(alt) || LOGO_SKIP.test(raw)) continue;
+      // Wix/Squarespace style transforms: keep the original asset.
+      const url = raw.replace(/\/v1\/(fill|crop|fit)\/[^?]*$/, '').replace(/[?#].*$/, '');
+      if (!/\.(png|jpe?g|webp|svg)$/i.test(url)) continue;
+      const key = url.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      urls.push(url);
+      if (urls.length >= 30) return urls;
+    }
+  }
+  return urls;
 }
 
 /** Rejects obvious non-company strings the model may still return. */
