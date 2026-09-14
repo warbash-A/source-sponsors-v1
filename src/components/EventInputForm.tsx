@@ -286,9 +286,36 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Events are discovered from public Meetup listings.
-      </p>
+      <div className="space-y-3">
+        <Label className="text-foreground text-sm font-medium">Where to search</Label>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {sourceOptions.map((option) => {
+            const active = selectedSources.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggleSource(option.value)}
+                className={cn(
+                  "rounded-md border px-3 py-2.5 text-left transition-all",
+                  active
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-card hover:bg-secondary/50"
+                )}
+              >
+                <span className={cn("block text-sm font-medium", active ? "text-primary" : "text-foreground")}>
+                  {option.label}
+                </span>
+                <span className="block text-xs text-muted-foreground mt-0.5">{option.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Conference websites usually publish sponsor lists, so they give the richest results. You can also paste any
+          event link (including Luma) on the next screen.
+        </p>
+      </div>
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
