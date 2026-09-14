@@ -56,7 +56,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
   });
 
   const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(
-    initialValues?.sources?.length ? initialValues.sources : ['eventbrite', 'meetup']
+    initialValues?.sources?.length ? initialValues.sources : ['meetup']
   );
   const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
 
