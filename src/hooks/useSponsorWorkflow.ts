@@ -14,8 +14,7 @@ import type {
 
 interface PersistedWorkflow {
   eventDetails: EventDetails | null;
-  eventbriteEvents: DiscoveredEvent[];
-  meetupEvents: DiscoveredEvent[];
+  events: DiscoveredEvent[];
   selectedEventIds: string[];
   sponsors: EnrichedSponsor[];
   currentStep: number;
@@ -25,8 +24,7 @@ const STORAGE_KEY = 'sponsorscout_workflow';
 
 const STORAGE_DEFAULTS: PersistedWorkflow = {
   eventDetails: null,
-  eventbriteEvents: [],
-  meetupEvents: [],
+  events: [],
   selectedEventIds: [],
   sponsors: [],
   currentStep: 0,

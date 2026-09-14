@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapPin, Building2, Tag, Sparkles, User, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
