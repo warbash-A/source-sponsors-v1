@@ -111,7 +111,7 @@ const Index = () => {
 
                   <Button
                     onClick={handleProceedToSponsors}
-                    disabled={selectedEventIds.length === 0 || isLoadingEventbrite || isLoadingMeetup || isLoading}
+                    disabled={selectedEventIds.length === 0 || isLoadingEvents || isLoading}
                     variant="gradient"
                   >
                     {isLoading ? (

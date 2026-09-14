@@ -55,20 +55,10 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     senderOrganization: initialValues?.senderOrganization ?? "",
   });
 
-  const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(
-    initialValues?.sources?.length ? initialValues.sources : ['meetup']
-  );
   const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
-
 
   const handleChange = (field: keyof EventDetails, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSourceToggle = (source: 'eventbrite' | 'meetup') => {
-    setSources((prev) =>
-      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
-    );
   };
 
   const isValid =
@@ -76,12 +66,11 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     formData.type &&
     formData.industry &&
     formData.location &&
-    formData.senderName?.trim() &&
-    sources.length > 0;
+    formData.senderName?.trim();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ ...formData, sources, eventCount });
+    onSubmit({ ...formData, eventCount });
   };
 
   return (
