@@ -89,7 +89,7 @@ const Index = () => {
                   Tell us about your event to find similar conferences and their sponsors
                 </p>
               </div>
-              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEventbrite || isLoadingMeetup} initialValues={eventDetails} />
+              <EventInputForm onSubmit={handleEventSubmit} isLoading={isLoadingEvents} initialValues={eventDetails} />
             </div>
           )}
 
@@ -98,14 +98,10 @@ const Index = () => {
             <div className="space-y-6">
               <div className="rounded-xl border border-border bg-card p-6 shadow-card">
                 <EventDiscoveryResults
-                  eventbriteEvents={eventbriteEvents}
-                  meetupEvents={meetupEvents}
+                  events={events}
                   selectedEvents={selectedEventIds}
                   onToggleEvent={handleToggleEvent}
-                  isLoadingEventbrite={isLoadingEventbrite}
-                  isLoadingMeetup={isLoadingMeetup}
-                  showEventbrite={eventDetails?.sources?.includes('eventbrite') ?? true}
-                  showMeetup={eventDetails?.sources?.includes('meetup') ?? false}
+                  isLoading={isLoadingEvents}
                 />
                 <div className="mt-6 flex justify-between gap-3">
                   <Button variant="outline" onClick={handleGoBack}>
