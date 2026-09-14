@@ -44,35 +44,14 @@ const EVENTS_SCHEMA = {
   },
 } as const;
 
-/** Luma organises public events into city calendars rather than a keyword search. */
-const LUMA_CITIES: Record<string, string> = {
-  'san francisco': 'sf', 'sf': 'sf', 'bay area': 'sf', 'silicon valley': 'sf',
-  'new york': 'nyc', 'nyc': 'nyc', 'brooklyn': 'nyc',
-  'los angeles': 'la', 'la': 'la',
-  'seattle': 'seattle', 'boston': 'boston', 'austin': 'austin', 'chicago': 'chicago',
-  'denver': 'denver', 'miami': 'miami', 'toronto': 'toronto', 'vancouver': 'vancouver',
-  'london': 'london', 'berlin': 'berlin', 'paris': 'paris', 'amsterdam': 'amsterdam',
-  'lisbon': 'lisbon', 'dublin': 'dublin', 'tel aviv': 'tel-aviv', 'dubai': 'dubai',
-  'bangalore': 'bangalore', 'bengaluru': 'bangalore', 'singapore': 'singapore',
-  'tokyo': 'tokyo', 'sydney': 'sydney',
-};
-
-function lumaUrl(keywords: string, location?: string): string {
-  const loc = (location ?? '').toLowerCase();
-  const slug = Object.keys(LUMA_CITIES).find((city) => loc.includes(city));
-  const base = slug ? `https://lu.ma/${LUMA_CITIES[slug]}` : 'https://lu.ma/discover';
-  return `${base}?k=${encodeURIComponent(keywords)}`;
-}
-
 /** Build the DuckDuckGo query for a channel. */
 function buildQuery(channel: Channel, keywords: string, location?: string): string {
   const place = location ? ` ${location}` : '';
   const year = new Date().getFullYear();
-  if (channel === 'luma') return `site:lu.ma ${keywords}${place}`;
   if (channel === 'directory') {
-    return `${keywords} conferences ${year} ${year + 1} list (site:confs.tech OR site:eventsget.com OR site:10times.com OR site:techmeme.com/events)`;
+    return `top ${keywords} conferences and summits ${year} ${year + 1} list`;
   }
-  return `${keywords} conference${place} ${year} OR ${year + 1} sponsors`;
+  return `${keywords} conference${place} ${year} ${year + 1} sponsors`;
 }
 
 /** DuckDuckGo wraps every result link in a redirect — decode back to the real URL. */
