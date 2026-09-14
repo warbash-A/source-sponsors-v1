@@ -56,7 +56,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
   });
 
   const [sources, setSources] = useState<('eventbrite' | 'meetup')[]>(
-    initialValues?.sources?.length ? initialValues.sources : ['eventbrite', 'meetup']
+    initialValues?.sources?.length ? initialValues.sources : ['meetup']
   );
   const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
 
@@ -200,7 +200,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
               onCheckedChange={() => handleSourceToggle('eventbrite')}
             />
             <Label htmlFor="source-eventbrite" className="text-sm cursor-pointer">
-              Eventbrite
+              Eventbrite <span className="text-muted-foreground">(your account only)</span>
             </Label>
           </div>
           <div className="flex items-center gap-2">
@@ -210,12 +210,18 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
               onCheckedChange={() => handleSourceToggle('meetup')}
             />
             <Label htmlFor="source-meetup" className="text-sm cursor-pointer">
-              Meetup
+              Meetup <span className="text-muted-foreground">(public events)</span>
             </Label>
           </div>
         </div>
         {sources.length === 0 && (
           <p className="text-xs text-muted-foreground">Select at least one source</p>
+        )}
+        {sources.includes('eventbrite') && (
+          <p className="text-xs text-muted-foreground">
+            Eventbrite no longer allows searching public events, so it only returns events from your
+            own Eventbrite account. Meetup covers public events.
+          </p>
         )}
       </div>
 
