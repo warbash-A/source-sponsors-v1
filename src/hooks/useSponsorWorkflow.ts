@@ -48,12 +48,9 @@ function readFromStorage(): PersistedWorkflow {
         typeof parsed.eventDetails.location === 'string'
         ? parsed.eventDetails as EventDetails
         : STORAGE_DEFAULTS.eventDetails,
-      eventbriteEvents: Array.isArray(parsed.eventbriteEvents)
-        ? parsed.eventbriteEvents
-        : STORAGE_DEFAULTS.eventbriteEvents,
-      meetupEvents: Array.isArray(parsed.meetupEvents)
-        ? parsed.meetupEvents
-        : STORAGE_DEFAULTS.meetupEvents,
+      events: Array.isArray(parsed.events)
+        ? parsed.events
+        : STORAGE_DEFAULTS.events,
       selectedEventIds: Array.isArray(parsed.selectedEventIds)
         ? parsed.selectedEventIds
         : STORAGE_DEFAULTS.selectedEventIds,
