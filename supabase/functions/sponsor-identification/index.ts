@@ -298,9 +298,14 @@ function collectLogoUrls(pages: Page[]): string[] {
     // Logos usually sit under a "Sponsors" / "Our partners" heading — start there
     // so decorative images higher up don't fill the budget.
     const headings = [...page.content.matchAll(/^#{1,4}[^\n]*(sponsor|partner|supporter|exhibitor)[^\n]*$/gim)];
-    const start = headings.length > 0 ? (headings[headings.length - 1].index ?? 0) : 0;
-    const section = page.content.slice(start);
-    const scope = /!\[[^\]]*\]\(https?:/.test(section) ? section : page.content;
+    const imageRe = /!\[[^\]]*\]\(https?:\/\//g;
+    let start = 0;
+    for (const heading of headings) {
+      const index = heading.index ?? 0;
+      const count = (page.content.slice(index).match(imageRe) ?? []).length;
+      if (count >= 3) start = index; // latest heading that still has a logo wall under it
+    }
+    const scope = page.content.slice(start);
     for (const match of scope.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
       const [, alt, raw] = match;
       if (LOGO_SKIP.test(alt) || LOGO_SKIP.test(raw)) continue;
