@@ -81,7 +81,7 @@ Each step feeds into the next:
 
 ## Known Limitations
 
-- **Eventbrite API key** not configured — falls back to JinaAI/sample data
+- **Meetup is the only event source** — Eventbrite was removed (its public search API was discontinued)
 - **Meetup integration** uses scraping only (no official API)
 - **No persistence** — refreshing the page loses all workflow state
 - **No authentication** — single-user, no saved searches
