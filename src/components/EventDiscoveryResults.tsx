@@ -201,12 +201,25 @@ export function EventDiscoveryResults({
                                 <MapPin className="h-3.5 w-3.5" />
                                 {event.location}
                               </span>
-                              {event.sponsorCount !== undefined && (
-                                <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                              {event.sponsorCount !== undefined ? (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    event.sponsorCount > 0
+                                      ? "border-primary/30 bg-primary/10 text-primary"
+                                      : "border-border bg-secondary text-muted-foreground"
+                                  )}
+                                >
                                   <Users className="h-3.5 w-3.5 mr-1" />
-                                  {event.sponsorCount} sponsors
+                                  {event.sponsorCount} sponsor{event.sponsorCount === 1 ? '' : 's'}
                                 </Badge>
-                              )}
+                              ) : isPrescanning ? (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  Checking sponsors…
+                                </span>
+                              ) : null}
+
                             </div>
                           </div>
                           <div
