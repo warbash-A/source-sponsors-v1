@@ -55,9 +55,10 @@ serve(async (req) => {
       `The user runs "${name}", a ${type} in the ${industry} industry, located in ${location}.`,
       descText,
       tagsText,
-      'Generate 3-6 short Meetup search queries that will find COMPLEMENTARY events — events that attract the same audience but are not direct competitors.',
-      'Each query should be 1-4 words, suitable for a Meetup keyword search.',
-      'Prefer specific community formats: hackathons, demo days, meetups, workshops, founder nights, conferences, etc.',
+      'Generate 3-6 short Meetup keyword search queries that will find COMPLEMENTARY events — events that attract the same audience but are not direct competitors.',
+      'Each query should be 1-4 realistic words that people actually type into Meetup search.',
+      'Use BROAD, high-volume terms (e.g., "AI", "machine learning", "tech", "startup", "developer", "founder") rather than narrow phrases like "AI hackathon" that rarely appear.',
+      'Include the location naturally only when it strengthens the query; the search system also passes the location separately.',
       'Return the queries as a JSON array of strings.',
     ].filter(Boolean).join(' ');
 
