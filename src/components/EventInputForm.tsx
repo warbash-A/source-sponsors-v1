@@ -179,40 +179,10 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
 
       </div>
 
-      <div className="space-y-3">
-        <Label className="text-foreground text-sm font-medium">Search Sources</Label>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="source-eventbrite"
-              checked={sources.includes('eventbrite')}
-              onCheckedChange={() => handleSourceToggle('eventbrite')}
-            />
-            <Label htmlFor="source-eventbrite" className="text-sm cursor-pointer">
-              Eventbrite <span className="text-muted-foreground">(your account only)</span>
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="source-meetup"
-              checked={sources.includes('meetup')}
-              onCheckedChange={() => handleSourceToggle('meetup')}
-            />
-            <Label htmlFor="source-meetup" className="text-sm cursor-pointer">
-              Meetup <span className="text-muted-foreground">(public events)</span>
-            </Label>
-          </div>
-        </div>
-        {sources.length === 0 && (
-          <p className="text-xs text-muted-foreground">Select at least one source</p>
-        )}
-        {sources.includes('eventbrite') && (
-          <p className="text-xs text-muted-foreground">
-            Eventbrite no longer allows searching public events, so it only returns events from your
-            own Eventbrite account. Meetup covers public events.
-          </p>
-        )}
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Events are discovered from public Meetup listings.
+      </p>
+
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
