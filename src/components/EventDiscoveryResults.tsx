@@ -116,9 +116,9 @@ export function EventDiscoveryResults({
         {similarMode && (
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-foreground">Similar Events</h3>
-            <Badge variant="outline" className="border border-primary/30 bg-primary/10 text-primary">
-              Meetup
-            </Badge>
+            {isPrescanning && (
+              <span className="text-xs text-muted-foreground">Checking sponsor counts…</span>
+            )}
           </div>
         )}
 
