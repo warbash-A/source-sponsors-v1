@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { EventDetails } from "@/types/sponsor";
+import type { EventDetails, EventSource } from "@/types/sponsor";
 
 interface EventInputFormProps {
   onSubmit: (details: EventDetails) => void;
