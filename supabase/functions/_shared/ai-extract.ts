@@ -39,7 +39,13 @@ export async function aiExtract<T>({ name, schema, instructions, content, imageU
       model: MODEL,
       input: [
         { role: 'developer', content: [{ type: 'input_text', text: instructions }] },
-        { role: 'user', content: [{ type: 'input_text', text: content }] },
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: content },
+            ...(imageUrls ?? []).map((url) => ({ type: 'input_image', image_url: url })),
+          ],
+        },
       ],
       stream: true,
       reasoning: { effort: 'low' },
