@@ -280,6 +280,37 @@ function isNotFound(content: string): boolean {
   return head.includes('error 404') || head.includes('page not found') || head.includes('404 not found');
 }
 
+const LOGO_INSTRUCTIONS = [
+  'You read company logos from sponsor walls and return the organisations they belong to.',
+  'For each image, return the company or organisation name written in or represented by the logo.',
+  'Skip images that are not company logos: decorative art, photos of people, banners, icons, arrows or the event\'s own branding.',
+  'If you cannot confidently read a logo, omit it. Never invent a sponsor.',
+  'tier must be "unknown" unless the ordering clearly indicates a tier; website must be an empty string.',
+].join(' ');
+
+const LOGO_SKIP = /(favicon|sprite|arrow|icon|banner|instagram|youtube|linkedin|twitter|facebook|placeholder)/i;
+
+/** Collects sponsor-logo image URLs from the scraped pages, normalised to their originals. */
+function collectLogoUrls(pages: Page[]): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const page of pages) {
+    for (const match of page.content.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
+      const [, alt, raw] = match;
+      if (LOGO_SKIP.test(alt) || LOGO_SKIP.test(raw)) continue;
+      // Wix/Squarespace style transforms: keep the original asset.
+      const url = raw.replace(/\/v1\/(fill|crop|fit)\/[^?]*$/, '').replace(/[?#].*$/, '');
+      if (!/\.(png|jpe?g|webp|svg)$/i.test(url)) continue;
+      const key = url.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      urls.push(url);
+      if (urls.length >= 24) return urls;
+    }
+  }
+  return urls;
+}
+
 /** Rejects obvious non-company strings the model may still return. */
 function isLikelyCompany(raw: string): boolean {
   const name = (raw ?? '').trim();
