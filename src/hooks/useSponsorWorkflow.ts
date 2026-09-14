@@ -306,6 +306,21 @@ export function useSponsorWorkflow() {
       const identified = sponsorData?.sponsors ?? [];
       const skipped: string[] = sponsorData?.eventsWithoutSponsors ?? [];
 
+      // Update each selected event with how many sponsors were found on it.
+      const sponsorCounts = new Map<string, number>();
+      for (const sponsor of identified) {
+        for (const eventId of sponsor.eventIds ?? []) {
+          sponsorCounts.set(eventId, (sponsorCounts.get(eventId) || 0) + 1);
+        }
+      }
+      setEvents((prev) =>
+        prev.map((event) =>
+          selectedEventIds.includes(event.id)
+            ? { ...event, sponsorCount: sponsorCounts.get(event.id) || 0 }
+            : event
+        )
+      );
+
       if (identified.length === 0) {
         setSponsors([]);
         updateStepStatus(3, "complete");
@@ -315,6 +330,7 @@ export function useSponsorWorkflow() {
         );
         return;
       }
+
 
       const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('contact-enrichment', {
         body: { sponsors: identified }
