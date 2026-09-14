@@ -107,7 +107,8 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     formData.type &&
     formData.industry &&
     formData.location &&
-    formData.senderName?.trim();
+    formData.senderName?.trim() &&
+    selectedSources.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

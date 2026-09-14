@@ -180,7 +180,7 @@ export function EventDiscoveryResults({
                                     : "border-primary/30 bg-primary/10 text-primary"
                                 )}
                               >
-                                {event.source === 'manual' ? 'Manual' : 'Meetup'}
+                                {sourceLabels[event.source] ?? 'Event'}
                               </Badge>
                             </div>
                             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
