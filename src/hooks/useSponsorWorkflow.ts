@@ -284,7 +284,7 @@ export function useSponsorWorkflow() {
     } finally {
       setIsLoadingEvents(false);
     }
-  }, [updateStepStatus]);
+  }, [updateStepStatus, prescanSponsorCounts]);
 
   const handleAddEventFromUrl = useCallback(async (url: string) => {
     setIsLoadingEvents(true);
@@ -576,6 +576,7 @@ export function useSponsorWorkflow() {
     eventDetails,
     events,
     isLoadingEvents,
+    isPrescanning,
     isLoading,
     selectedEventIds,
     sponsors,
