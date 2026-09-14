@@ -317,21 +317,27 @@ export function useSponsorWorkflow() {
         source: 'manual',
       };
 
+      let isDuplicate = false;
       setEvents((prev) => {
         if (prev.some((e) => e.url === event.url)) {
+          isDuplicate = true;
           toast.info('That event is already in your list.');
           return prev;
         }
         return [...prev, event];
       });
-      toast.success(`Added "${event.name}"`);
+      if (!isDuplicate) {
+        toast.success(`Added "${event.name}"`);
+        void prescanSponsorCounts([event]);
+      }
     } catch (err) {
       console.error('Add event from URL error:', err);
       toast.error('Could not add event from URL.');
     } finally {
       setIsLoadingEvents(false);
     }
-  }, []);
+  }, [prescanSponsorCounts]);
+
 
   const handleToggleEvent = useCallback((eventId: string) => {
     setSelectedEventIds((prev) =>
