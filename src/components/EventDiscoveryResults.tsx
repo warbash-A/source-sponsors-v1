@@ -18,6 +18,7 @@ interface EventDiscoveryResultsProps {
   selectedEvents: string[];
   onToggleEvent: (eventId: string) => void;
   isLoading: boolean;
+  isPrescanning?: boolean;
   researchMode?: 'mine' | 'similar';
   searchQueries?: string[];
   onAddEventFromUrl?: (url: string) => void | Promise<void>;
@@ -28,6 +29,7 @@ export function EventDiscoveryResults({
   selectedEvents,
   onToggleEvent,
   isLoading,
+  isPrescanning = false,
   researchMode = 'mine',
   searchQueries = [],
   onAddEventFromUrl,
