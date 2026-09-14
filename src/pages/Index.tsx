@@ -12,10 +12,8 @@ const Index = () => {
   const {
     currentStep,
     steps,
-    eventbriteEvents,
-    meetupEvents,
-    isLoadingEventbrite,
-    isLoadingMeetup,
+    events,
+    isLoadingEvents,
     isLoading,
     eventDetails,
     selectedEventIds,
