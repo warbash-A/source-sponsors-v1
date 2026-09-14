@@ -19,10 +19,10 @@ SponsorScout automates the end-to-end process of finding potential sponsors for 
 
 ### Step 2: Event Discovery
 - **Input**: Keywords derived from event details + location
-- **Backend**: `event-discovery` edge function
-- **Data Sources**: Eventbrite API, Apify scraping, or sample data fallback
-- **Output**: List of similar events with name, date, location, URL, sponsor count
-- **UI**: Selectable event list with checkboxes; data source indicator badge
+- **Backend**: `meetup-discovery`, `similar-event-queries`, and `event-from-url` edge functions
+- **Data Sources**: Public Meetup listings via scraping, plus manual URL input for any event page
+- **Output**: List of similar events with name, date, location, URL, sponsor count, and source query
+- **UI**: Selectable event list with checkboxes; query grouping in similar-events mode
 
 ### Step 3: Sponsor Identification & Contact Enrichment
 - **Input**: Selected events from Step 2
@@ -60,15 +60,16 @@ SponsorScout automates the end-to-end process of finding potential sponsors for 
 | location | string | ✓        |
 
 ### DiscoveredEvent
-| Field        | Type                              | Required |
-|--------------|-----------------------------------|----------|
-| id           | string                            | ✓        |
-| name         | string                            | ✓        |
-| date         | string                            | ✓        |
-| location     | string                            | ✓        |
-| url          | string                            | ✓        |
-| source       | 'eventbrite' \| 'apify' \| 'sample' | ✓     |
-| sponsorCount | number                            | ✗        |
+| Field        | Type                    | Required |
+|--------------|-------------------------|----------|
+| id           | string                  | ✓        |
+| name         | string                  | ✓        |
+| date         | string                  | ✓        |
+| location     | string                  | ✓        |
+| url          | string                  | ✓        |
+| source       | 'meetup' \| 'manual'    | ✓        |
+| query        | string                  | ✗        |
+| sponsorCount | number                  | ✗        |
 
 ### EnrichedSponsor
 | Field            | Type                                               | Required |
@@ -129,7 +130,6 @@ SponsorScout automates the end-to-end process of finding potential sponsors for 
 | `SponsorList`            | Filterable, sortable sponsor data table      |
 | `EmailPreview`           | Email draft viewer                           |
 | `ExportPanel`            | Export format selection with download         |
-| `DataSourceIndicator`    | Badge showing live vs sample data            |
 
 ## 9. Future Enhancements
 
@@ -137,6 +137,6 @@ SponsorScout automates the end-to-end process of finding potential sponsors for 
 - User authentication and saved searches
 - Direct email sending via SMTP integration
 - CRM export (HubSpot, Salesforce)
-- Real-time event API integrations (Eventbrite, Luma, Lu.ma)
+- Real-time event API integrations (Luma, Lu.ma, Eventbrite for owned accounts)
 - Sponsor scoring/ranking algorithm
 - Bulk email customization editor
