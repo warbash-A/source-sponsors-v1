@@ -311,7 +311,7 @@ function collectLogoUrls(pages: Page[]): string[] {
       if (seen.has(key)) continue;
       seen.add(key);
       urls.push(url);
-      if (urls.length >= 24) return urls;
+      if (urls.length >= 30) return urls;
     }
   }
   return urls;
