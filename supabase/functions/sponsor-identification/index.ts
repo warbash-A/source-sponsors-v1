@@ -121,7 +121,28 @@ serve(async (req) => {
         }
 
         console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
-        const found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
+        let found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
+
+        // Many sponsor pages show logos as images with no text. Read the logos directly.
+        if (found.length === 0) {
+          const logos = collectLogoUrls(pages);
+          if (logos.length > 0) {
+            console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
+            try {
+              const fromLogos = await aiExtract<ExtractedSponsors>({
+                name: 'event_sponsors',
+                schema: SPONSORS_SCHEMA as unknown as Record<string, unknown>,
+                instructions: LOGO_INSTRUCTIONS,
+                content: `These images are the sponsor/partner logos shown on the page for the event "${event.name}". Name each sponsoring organisation you can read.`,
+                imageUrls: logos,
+              });
+              found = (fromLogos.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
+              console.log(`Logo vision returned ${found.length} sponsors for ${event.name}`);
+            } catch (err) {
+              console.error('Logo vision failed', event.name, err);
+            }
+          }
+        }
         if (found.length === 0) {
           eventsWithoutSponsors.push(event.name);
           continue;
