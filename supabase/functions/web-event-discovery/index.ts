@@ -96,7 +96,22 @@ serve(async (req) => {
       });
     }
 
-    const content = decodeRedirects(raw);
+    let content = decodeRedirects(raw);
+
+    // Directory mode: the search results are round-up articles, so open the top two
+    // and read the conferences they actually list (with their real links).
+    if (channel === 'directory') {
+      const candidates = [...new Set(
+        [...content.matchAll(/\((https?:\/\/[^)\s]+)\)/g)]
+          .map((m) => m[1])
+          .filter((u) => !u.includes('duckduckgo.com') && !u.includes('.ico') && !u.includes('bing.com')),
+      )].slice(0, 2);
+      const pages = await Promise.all(candidates.map((u) => readPage(u, 25000)));
+      const usable = pages.filter((p): p is string => Boolean(p));
+      if (usable.length > 0) content = usable.join('\n\n---\n\n');
+      console.log('Directory pages read:', usable.length, candidates.join(', '));
+    }
+
 
     let extracted: ExtractedEvents;
     try {
