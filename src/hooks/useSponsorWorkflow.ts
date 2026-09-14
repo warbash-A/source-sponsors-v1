@@ -277,7 +277,7 @@ export function useSponsorWorkflow() {
 
       if (found.length > 0) {
         toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
-        void prescanSponsorCounts(found.slice(0, 5));
+        void prescanSponsorCounts(found);
       } else {
         toast.warning(
           lastMessage ?? 'No events found. Try broader keywords, a different location, or paste event URLs directly.'
