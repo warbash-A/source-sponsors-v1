@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DiscoveredEvent } from "@/types/sponsor";
 
+const sourceLabels: Record<string, string> = {
+  manual: 'Manual',
+  meetup: 'Meetup',
+  web: 'Conference site',
+  directory: 'Directory',
+};
+
 interface EventDiscoveryResultsProps {
   events: DiscoveredEvent[];
   selectedEvents: string[];
