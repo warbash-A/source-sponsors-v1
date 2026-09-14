@@ -81,7 +81,7 @@ Each step feeds into the next:
 
 ## Known Limitations
 
-- **Meetup is the only event source** — Eventbrite was removed (its public search API was discontinued)
+- **Meetup is the only event source** — public Meetup listings are scraped; Eventbrite was removed
 - **Meetup integration** uses scraping only (no official API)
 - **No persistence** — refreshing the page loses all workflow state
 - **No authentication** — single-user, no saved searches

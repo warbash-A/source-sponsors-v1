@@ -27,12 +27,18 @@ const tierConfig = {
 type TierFilter = "all" | keyof typeof tierConfig;
 type StatusFilter = "all" | EnrichedSponsor["enrichmentStatus"];
 type SortOption = "name" | "tier" | "events" | "status";
+type MinEventsFilter = "all" | "2" | "3" | "4" | "5";
 
 export function SponsorList({ sponsors, showEnrichment = false }: SponsorListProps) {
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortBy, setSortBy] = useState<SortOption>("tier");
-  const [sortAsc, setSortAsc] = useState(true);
+  const [sortBy, setSortBy] = useState<SortOption>("events");
+  const [sortAsc, setSortAsc] = useState(false);
+  const [minEventsFilter, setMinEventsFilter] = useState<MinEventsFilter>("all");
+
+  const maxEventCount = useMemo(() => {
+    return Math.max(1, ...sponsors.map((s) => s.eventCount ?? s.events.length ?? 1));
+  }, [sponsors]);
 
   const filteredAndSortedSponsors = useMemo(() => {
     let result = [...sponsors];
@@ -47,6 +53,12 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
       result = result.filter((s) => s.enrichmentStatus === statusFilter);
     }
 
+    // Apply minimum events filter
+    if (minEventsFilter !== "all") {
+      const min = parseInt(minEventsFilter, 10);
+      result = result.filter((s) => (s.eventCount ?? s.events.length ?? 0) >= min);
+    }
+
     // Apply sorting
     result.sort((a, b) => {
       let comparison = 0;
@@ -58,7 +70,7 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
           comparison = tierConfig[a.tier].order - tierConfig[b.tier].order;
           break;
         case "events":
-          comparison = b.events.length - a.events.length;
+          comparison = (b.eventCount ?? b.events.length ?? 0) - (a.eventCount ?? a.events.length ?? 0);
           break;
         case "status":
           const statusOrder = { complete: 1, partial: 2, processing: 3, pending: 4, failed: 5 };
@@ -69,7 +81,7 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
     });
 
     return result;
-  }, [sponsors, tierFilter, statusFilter, sortBy, sortAsc, showEnrichment]);
+  }, [sponsors, tierFilter, statusFilter, sortBy, sortAsc, minEventsFilter, showEnrichment]);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -100,6 +112,21 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
               </SelectContent>
             </Select>
           </div>
+
+          {maxEventCount > 1 && (
+            <Select value={minEventsFilter} onValueChange={(v) => setMinEventsFilter(v as MinEventsFilter)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs bg-card border-border">
+                <SelectValue placeholder="Min events" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border">
+                <SelectItem value="all">All events</SelectItem>
+                <SelectItem value="2">2+ events</SelectItem>
+                {maxEventCount >= 3 && <SelectItem value="3">3+ events</SelectItem>}
+                {maxEventCount >= 4 && <SelectItem value="4">4+ events</SelectItem>}
+                {maxEventCount >= 5 && <SelectItem value="5">5+ events</SelectItem>}
+              </SelectContent>
+            </Select>
+          )}
 
           {showEnrichment && (
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
@@ -169,7 +196,8 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
             <tbody className="divide-y divide-border">
               {filteredAndSortedSponsors.map((sponsor, index) => {
                 const tier = tierConfig[sponsor.tier];
-                
+                const eventCount = sponsor.eventCount ?? sponsor.events.length ?? 0;
+
                 return (
                   <tr
                     key={sponsor.id}
@@ -190,7 +218,14 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-foreground">{sponsor.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground">{sponsor.name}</p>
+                            {eventCount > 1 && (
+                              <Badge variant="outline" className="border-success/30 bg-success/10 text-success text-[10px] px-1.5 py-0">
+                                {eventCount} events
+                              </Badge>
+                            )}
+                          </div>
                           {sponsor.website && (
                             <a
                               href={sponsor.website}

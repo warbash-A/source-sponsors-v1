@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { MapPin, Building2, Tag, Sparkles, User, Briefcase } from "lucide-react";
+import { MapPin, Building2, Tag, Sparkles, User, Briefcase, Search, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type { EventDetails } from "@/types/sponsor";
 
 interface EventInputFormProps {
@@ -18,7 +19,6 @@ interface EventInputFormProps {
   isLoading?: boolean;
   initialValues?: EventDetails | null;
 }
-
 
 const eventTypes = [
   "Conference",
@@ -45,6 +45,17 @@ const industries = [
   "Non-Profit",
 ];
 
+const focusTagOptions = [
+  "Hackathon",
+  "Demo Day",
+  "Meetup",
+  "Workshop",
+  "Conference",
+  "Founder Night",
+  "Networking",
+  "Webinar",
+];
+
 export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInputFormProps) {
   const [formData, setFormData] = useState<EventDetails>({
     name: initialValues?.name ?? "",
@@ -53,12 +64,26 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     location: initialValues?.location ?? "",
     senderName: initialValues?.senderName ?? "",
     senderOrganization: initialValues?.senderOrganization ?? "",
+    researchMode: initialValues?.researchMode ?? "mine",
+    description: initialValues?.description ?? "",
+    focusTags: initialValues?.focusTags ?? [],
   });
 
   const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
 
-  const handleChange = (field: keyof EventDetails, value: string) => {
+  const handleChange = (field: keyof EventDetails, value: string | string[] | undefined) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFocusTag = (tag: string) => {
+    setFormData((prev) => {
+      const current = prev.focusTags ?? [];
+      const lowerTag = tag.toLowerCase();
+      if (current.includes(lowerTag)) {
+        return { ...prev, focusTags: current.filter((t) => t !== lowerTag) };
+      }
+      return { ...prev, focusTags: [...current, lowerTag] };
+    });
   };
 
   const isValid =
@@ -73,8 +98,47 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     onSubmit({ ...formData, eventCount });
   };
 
+  const similarMode = formData.researchMode === "similar";
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
+      <div className="rounded-lg border border-border bg-secondary/30 p-4">
+        <Label className="text-foreground text-sm font-medium mb-3 block">What do you want to research?</Label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleChange("researchMode", "mine")}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-medium transition-all",
+              formData.researchMode === "mine"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-card text-muted-foreground hover:bg-secondary/50"
+            )}
+          >
+            <Search className="h-4 w-4" />
+            Find sponsors for my event
+          </button>
+          <button
+            type="button"
+            onClick={() => handleChange("researchMode", "similar")}
+            className={cn(
+              "flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-medium transition-all",
+              formData.researchMode === "similar"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-card text-muted-foreground hover:bg-secondary/50"
+            )}
+          >
+            <Lightbulb className="h-4 w-4" />
+            Find sponsors of similar events
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          {similarMode
+            ? "We'll discover complementary events that attract the same audience, then extract their sponsors so you can see who already sponsors events like yours."
+            : "We'll search for events matching your details and extract their sponsors."}
+        </p>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name" className="flex items-center gap-2 text-foreground">
@@ -83,7 +147,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
           </Label>
           <Input
             id="name"
-            placeholder="e.g., TechCrunch Disrupt 2024"
+            placeholder="e.g., AI Tinkerers"
             value={formData.name}
             onChange={(e) => handleChange("name", e.target.value)}
             className="bg-secondary/50 border-border focus:border-primary"
@@ -176,13 +240,55 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
             className="bg-secondary/50 border-border focus:border-primary"
           />
         </div>
-
       </div>
+
+      {similarMode && (
+        <div className="space-y-4 rounded-lg border border-border bg-card p-4 animate-fade-in">
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-foreground">
+              Event description / audience
+            </Label>
+            <Textarea
+              id="description"
+              placeholder="e.g., A monthly gathering of AI builders, tinkerers, and founders who demo side projects and LLM experiments."
+              value={formData.description ?? ""}
+              onChange={(e) => handleChange("description", e.target.value)}
+              className="bg-secondary/50 border-border focus:border-primary min-h-[80px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              This helps us find events with a matching audience.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground">Complementary event formats</Label>
+            <div className="flex flex-wrap gap-2">
+              {focusTagOptions.map((tag) => {
+                const active = (formData.focusTags ?? []).includes(tag.toLowerCase());
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleFocusTag(tag)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-secondary text-muted-foreground hover:bg-secondary/80"
+                    )}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Events are discovered from public Meetup listings.
       </p>
-
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
@@ -216,7 +322,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            Start Discovery
+            {similarMode ? "Find Similar Events" : "Start Discovery"}
           </>
         )}
       </Button>
