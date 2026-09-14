@@ -6,11 +6,19 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DiscoveredEvent } from "@/types/sponsor";
 
+const sourceLabels: Record<string, string> = {
+  manual: 'Manual',
+  meetup: 'Meetup',
+  web: 'Conference site',
+  directory: 'Directory',
+};
+
 interface EventDiscoveryResultsProps {
   events: DiscoveredEvent[];
   selectedEvents: string[];
   onToggleEvent: (eventId: string) => void;
   isLoading: boolean;
+  isPrescanning?: boolean;
   researchMode?: 'mine' | 'similar';
   searchQueries?: string[];
   onAddEventFromUrl?: (url: string) => void | Promise<void>;
@@ -21,6 +29,7 @@ export function EventDiscoveryResults({
   selectedEvents,
   onToggleEvent,
   isLoading,
+  isPrescanning = false,
   researchMode = 'mine',
   searchQueries = [],
   onAddEventFromUrl,
@@ -109,9 +118,9 @@ export function EventDiscoveryResults({
         {similarMode && (
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-foreground">Similar Events</h3>
-            <Badge variant="outline" className="border border-primary/30 bg-primary/10 text-primary">
-              Meetup
-            </Badge>
+            {isPrescanning && (
+              <span className="text-xs text-muted-foreground">Checking sponsor counts…</span>
+            )}
           </div>
         )}
 
@@ -180,7 +189,7 @@ export function EventDiscoveryResults({
                                     : "border-primary/30 bg-primary/10 text-primary"
                                 )}
                               >
-                                {event.source === 'manual' ? 'Manual' : 'Meetup'}
+                                {sourceLabels[event.source] ?? 'Event'}
                               </Badge>
                             </div>
                             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">

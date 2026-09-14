@@ -8,6 +8,7 @@ import type {
   EmailDraft,
   WorkflowStep,
   ExportFormat,
+  EventSource,
 } from "@/types/sponsor";
 
 // ─── localStorage persistence ────────────────────────────────────────────────
@@ -118,6 +119,7 @@ export function useSponsorWorkflow() {
   const [maxStepReached, setMaxStepReached] = useState<number>(stored.currentStep);
   const [researchMode, setResearchMode] = useState<'mine' | 'similar'>(stored.researchMode ?? 'mine');
   const [searchQueries, setSearchQueries] = useState<string[]>(stored.searchQueries ?? []);
+  const [isPrescanning, setIsPrescanning] = useState(false);
 
   useEffect(() => {
     setMaxStepReached((prev) => (currentStep > prev ? currentStep : prev));
@@ -132,6 +134,39 @@ export function useSponsorWorkflow() {
   useEffect(() => {
     writeToStorage({ eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries });
   }, [eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries]);
+
+  /**
+   * Reads sponsor pages for the first handful of results so the user can see how many
+   * sponsors each event has before choosing which ones to work with.
+   */
+  const prescanSponsorCounts = useCallback(async (candidates: DiscoveredEvent[]) => {
+    if (candidates.length === 0) return;
+    setIsPrescanning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sponsor-identification', {
+        body: { events: candidates },
+      });
+      if (error) throw error;
+
+      const counts = new Map<string, number>();
+      for (const id of candidates.map((c) => c.id)) counts.set(id, 0);
+      for (const sponsor of data?.sponsors ?? []) {
+        for (const eventId of sponsor.eventIds ?? []) {
+          counts.set(eventId, (counts.get(eventId) || 0) + 1);
+        }
+      }
+
+      setEvents((prev) =>
+        prev.map((event) =>
+          counts.has(event.id) ? { ...event, sponsorCount: counts.get(event.id) } : event
+        )
+      );
+    } catch (err) {
+      console.error('Sponsor pre-scan error:', err);
+    } finally {
+      setIsPrescanning(false);
+    }
+  }, []);
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
     setEventDetails(details);
@@ -181,41 +216,52 @@ export function useSponsorWorkflow() {
       const seen = new Set<string>();
       const found: DiscoveredEvent[] = [];
       let lastMessage: string | undefined;
+      const sources: EventSource[] = details.sources?.length ? details.sources : ['meetup', 'web'];
 
       for (const query of queries) {
         if (found.length >= eventCount) break;
 
-        const { data, error } = await supabase.functions.invoke('meetup-discovery', {
-          body: {
-            keywords: query,
-            location: details.location,
-            eventCount: Math.min(eventCount - found.length, 50),
-          },
-        });
-
-        if (error) {
-          console.error('Meetup discovery error for query:', query, error);
-          continue;
-        }
-
-        const payload = data ?? {};
-        lastMessage = payload.message;
-
-        for (const e of payload.events ?? []) {
-          const url = (e.url ?? '').trim();
-          const name = (e.name ?? '').trim();
-          if (!name || !url.includes('meetup.com') || seen.has(url)) continue;
-          seen.add(url);
-          found.push({
-            id: crypto.randomUUID(),
-            name,
-            url,
-            date: e.date?.trim() || 'TBD',
-            location: e.location?.trim() || details.location || 'See event page',
-            source: 'meetup' as const,
-            query: mode === 'similar' ? query : undefined,
-          });
+        for (const source of sources) {
           if (found.length >= eventCount) break;
+
+          const remaining = eventCount - found.length;
+          const { data, error } = source === 'meetup'
+            ? await supabase.functions.invoke('meetup-discovery', {
+                body: { keywords: query, location: details.location, eventCount: Math.min(remaining, 50) },
+              })
+            : await supabase.functions.invoke('web-event-discovery', {
+                body: {
+                  keywords: query,
+                  location: details.location,
+                  channel: source,
+                  eventCount: Math.min(remaining, 25),
+                },
+              });
+
+          if (error) {
+            console.error('Event discovery error:', source, query, error);
+            continue;
+          }
+
+          const payload = data ?? {};
+          if (payload.message) lastMessage = payload.message;
+
+          for (const e of payload.events ?? []) {
+            const url = (e.url ?? '').trim();
+            const name = (e.name ?? '').trim();
+            if (!name || !url.startsWith('http') || seen.has(url)) continue;
+            seen.add(url);
+            found.push({
+              id: crypto.randomUUID(),
+              name,
+              url,
+              date: e.date?.trim() || 'TBD',
+              location: e.location?.trim() || details.location || 'See event page',
+              source,
+              query: mode === 'similar' ? query : undefined,
+            });
+            if (found.length >= eventCount) break;
+          }
         }
       }
 
@@ -224,6 +270,7 @@ export function useSponsorWorkflow() {
 
       if (found.length > 0) {
         toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
+        void prescanSponsorCounts(found.slice(0, 5));
       } else {
         toast.warning(
           lastMessage ?? 'No events found. Try broader keywords, a different location, or paste event URLs directly.'
@@ -237,7 +284,7 @@ export function useSponsorWorkflow() {
     } finally {
       setIsLoadingEvents(false);
     }
-  }, [updateStepStatus]);
+  }, [updateStepStatus, prescanSponsorCounts]);
 
   const handleAddEventFromUrl = useCallback(async (url: string) => {
     setIsLoadingEvents(true);
@@ -529,6 +576,7 @@ export function useSponsorWorkflow() {
     eventDetails,
     events,
     isLoadingEvents,
+    isPrescanning,
     isLoading,
     selectedEventIds,
     sponsors,

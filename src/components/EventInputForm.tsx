@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { EventDetails } from "@/types/sponsor";
+import type { EventDetails, EventSource } from "@/types/sponsor";
 
 interface EventInputFormProps {
   onSubmit: (details: EventDetails) => void;
@@ -56,7 +56,23 @@ const focusTagOptions = [
   "Webinar",
 ];
 
+const sourceOptions: { value: EventSource; label: string; hint: string }[] = [
+  { value: "web", label: "Conference sites", hint: "Official event websites" },
+  { value: "directory", label: "Conference directories", hint: "Curated industry round-ups" },
+  { value: "meetup", label: "Meetup", hint: "Public community events" },
+];
+
 export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInputFormProps) {
+  const [selectedSources, setSelectedSources] = useState<EventSource[]>(
+    initialValues?.sources?.length ? initialValues.sources : ["web", "meetup"]
+  );
+
+  const toggleSource = (source: EventSource) => {
+    setSelectedSources((prev) =>
+      prev.includes(source) ? prev.filter((s) => s !== source) : [...prev, source]
+    );
+  };
+
   const [formData, setFormData] = useState<EventDetails>({
     name: initialValues?.name ?? "",
     type: initialValues?.type ?? "",
@@ -91,11 +107,12 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     formData.type &&
     formData.industry &&
     formData.location &&
-    formData.senderName?.trim();
+    formData.senderName?.trim() &&
+    selectedSources.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ ...formData, eventCount });
+    onSubmit({ ...formData, eventCount, sources: selectedSources });
   };
 
   const similarMode = formData.researchMode === "similar";
@@ -286,9 +303,36 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Events are discovered from public Meetup listings.
-      </p>
+      <div className="space-y-3">
+        <Label className="text-foreground text-sm font-medium">Where to search</Label>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {sourceOptions.map((option) => {
+            const active = selectedSources.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggleSource(option.value)}
+                className={cn(
+                  "rounded-md border px-3 py-2.5 text-left transition-all",
+                  active
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-card hover:bg-secondary/50"
+                )}
+              >
+                <span className={cn("block text-sm font-medium", active ? "text-primary" : "text-foreground")}>
+                  {option.label}
+                </span>
+                <span className="block text-xs text-muted-foreground mt-0.5">{option.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Conference websites usually publish sponsor lists, so they give the richest results. You can also paste any
+          event link (including Luma) on the next screen.
+        </p>
+      </div>
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>

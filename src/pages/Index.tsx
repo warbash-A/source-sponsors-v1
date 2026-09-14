@@ -14,6 +14,7 @@ const Index = () => {
     steps,
     events,
     isLoadingEvents,
+    isPrescanning,
     isLoading,
     eventDetails,
     selectedEventIds,
@@ -107,6 +108,7 @@ const Index = () => {
                   selectedEvents={selectedEventIds}
                   onToggleEvent={handleToggleEvent}
                   isLoading={isLoadingEvents}
+                  isPrescanning={isPrescanning}
                   researchMode={researchMode}
                   searchQueries={searchQueries}
                   onAddEventFromUrl={handleAddEventFromUrl}

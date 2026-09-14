@@ -14,7 +14,12 @@ export interface EventDetails {
   description?: string;
   /** Tags that describe complementary event types the user wants to discover. */
   focusTags?: string[];
+  /** Which discovery sources to search. */
+  sources?: EventSource[];
 }
+
+/** Where a discovered event came from. */
+export type EventSource = 'meetup' | 'web' | 'directory';
 
 export interface DiscoveredEvent {
   id: string;
@@ -22,7 +27,7 @@ export interface DiscoveredEvent {
   date: string;
   location: string;
   url: string;
-  source: 'meetup' | 'manual';
+  source: EventSource | 'manual';
   sponsorCount?: number;
   /** The search query that produced this event, when discovered automatically. */
   query?: string;
