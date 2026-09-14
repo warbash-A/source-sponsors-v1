@@ -63,11 +63,13 @@ export function EventDiscoveryResults({
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {events.length} event{events.length === 1 ? '' : 's'} found
+          {isPrescanning && ' · counting sponsors…'}
         </p>
         <p className="text-sm font-medium text-foreground">
           {selectedEvents.length} selected
         </p>
       </div>
+
 
       {similarMode && searchQueries.length > 0 && (
         <div className="space-y-2">
