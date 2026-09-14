@@ -303,7 +303,7 @@ function collectLogoUrls(pages: Page[]): string[] {
     for (const heading of headings) {
       const index = heading.index ?? 0;
       const count = (page.content.slice(index).match(imageRe) ?? []).length;
-      if (count >= 3) start = index; // latest heading that still has a logo wall under it
+      if (count >= 5) start = index; // latest heading that still has a logo wall under it
     }
     const scope = page.content.slice(start);
     for (const match of scope.matchAll(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g)) {
