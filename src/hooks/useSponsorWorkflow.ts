@@ -136,37 +136,44 @@ export function useSponsorWorkflow() {
   }, [eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries]);
 
   /**
-   * Reads sponsor pages for the first handful of results so the user can see how many
-   * sponsors each event has before choosing which ones to work with.
+   * Reads sponsor pages for every discovered event, in small batches, so the user can
+   * see how many sponsors each event has before choosing which ones to work with.
    */
   const prescanSponsorCounts = useCallback(async (candidates: DiscoveredEvent[]) => {
     if (candidates.length === 0) return;
     setIsPrescanning(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sponsor-identification', {
-        body: { events: candidates },
-      });
-      if (error) throw error;
+      const BATCH = 4;
+      for (let i = 0; i < candidates.length; i += BATCH) {
+        const batch = candidates.slice(i, i + BATCH);
+        try {
+          const { data, error } = await supabase.functions.invoke('sponsor-identification', {
+            body: { events: batch },
+          });
+          if (error) throw error;
 
-      const counts = new Map<string, number>();
-      for (const id of candidates.map((c) => c.id)) counts.set(id, 0);
-      for (const sponsor of data?.sponsors ?? []) {
-        for (const eventId of sponsor.eventIds ?? []) {
-          counts.set(eventId, (counts.get(eventId) || 0) + 1);
+          const counts = new Map<string, number>();
+          for (const id of batch.map((c) => c.id)) counts.set(id, 0);
+          for (const sponsor of data?.sponsors ?? []) {
+            for (const eventId of sponsor.eventIds ?? []) {
+              counts.set(eventId, (counts.get(eventId) || 0) + 1);
+            }
+          }
+
+          setEvents((prev) =>
+            prev.map((event) =>
+              counts.has(event.id) ? { ...event, sponsorCount: counts.get(event.id) } : event
+            )
+          );
+        } catch (err) {
+          console.error('Sponsor pre-scan batch error:', err);
         }
       }
-
-      setEvents((prev) =>
-        prev.map((event) =>
-          counts.has(event.id) ? { ...event, sponsorCount: counts.get(event.id) } : event
-        )
-      );
-    } catch (err) {
-      console.error('Sponsor pre-scan error:', err);
     } finally {
       setIsPrescanning(false);
     }
   }, []);
+
 
   const handleEventSubmit = useCallback(async (details: EventDetails) => {
     setEventDetails(details);
@@ -270,7 +277,7 @@ export function useSponsorWorkflow() {
 
       if (found.length > 0) {
         toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
-        void prescanSponsorCounts(found.slice(0, 5));
+        void prescanSponsorCounts(found);
       } else {
         toast.warning(
           lastMessage ?? 'No events found. Try broader keywords, a different location, or paste event URLs directly.'
@@ -310,21 +317,27 @@ export function useSponsorWorkflow() {
         source: 'manual',
       };
 
+      let isDuplicate = false;
       setEvents((prev) => {
         if (prev.some((e) => e.url === event.url)) {
+          isDuplicate = true;
           toast.info('That event is already in your list.');
           return prev;
         }
         return [...prev, event];
       });
-      toast.success(`Added "${event.name}"`);
+      if (!isDuplicate) {
+        toast.success(`Added "${event.name}"`);
+        void prescanSponsorCounts([event]);
+      }
     } catch (err) {
       console.error('Add event from URL error:', err);
       toast.error('Could not add event from URL.');
     } finally {
       setIsLoadingEvents(false);
     }
-  }, []);
+  }, [prescanSponsorCounts]);
+
 
   const handleToggleEvent = useCallback((eventId: string) => {
     setSelectedEventIds((prev) =>
