@@ -181,41 +181,52 @@ export function useSponsorWorkflow() {
       const seen = new Set<string>();
       const found: DiscoveredEvent[] = [];
       let lastMessage: string | undefined;
+      const sources: EventSource[] = details.sources?.length ? details.sources : ['meetup', 'web'];
 
       for (const query of queries) {
         if (found.length >= eventCount) break;
 
-        const { data, error } = await supabase.functions.invoke('meetup-discovery', {
-          body: {
-            keywords: query,
-            location: details.location,
-            eventCount: Math.min(eventCount - found.length, 50),
-          },
-        });
-
-        if (error) {
-          console.error('Meetup discovery error for query:', query, error);
-          continue;
-        }
-
-        const payload = data ?? {};
-        lastMessage = payload.message;
-
-        for (const e of payload.events ?? []) {
-          const url = (e.url ?? '').trim();
-          const name = (e.name ?? '').trim();
-          if (!name || !url.includes('meetup.com') || seen.has(url)) continue;
-          seen.add(url);
-          found.push({
-            id: crypto.randomUUID(),
-            name,
-            url,
-            date: e.date?.trim() || 'TBD',
-            location: e.location?.trim() || details.location || 'See event page',
-            source: 'meetup' as const,
-            query: mode === 'similar' ? query : undefined,
-          });
+        for (const source of sources) {
           if (found.length >= eventCount) break;
+
+          const remaining = eventCount - found.length;
+          const { data, error } = source === 'meetup'
+            ? await supabase.functions.invoke('meetup-discovery', {
+                body: { keywords: query, location: details.location, eventCount: Math.min(remaining, 50) },
+              })
+            : await supabase.functions.invoke('web-event-discovery', {
+                body: {
+                  keywords: query,
+                  location: details.location,
+                  channel: source,
+                  eventCount: Math.min(remaining, 25),
+                },
+              });
+
+          if (error) {
+            console.error('Event discovery error:', source, query, error);
+            continue;
+          }
+
+          const payload = data ?? {};
+          if (payload.message) lastMessage = payload.message;
+
+          for (const e of payload.events ?? []) {
+            const url = (e.url ?? '').trim();
+            const name = (e.name ?? '').trim();
+            if (!name || !url.startsWith('http') || seen.has(url)) continue;
+            seen.add(url);
+            found.push({
+              id: crypto.randomUUID(),
+              name,
+              url,
+              date: e.date?.trim() || 'TBD',
+              location: e.location?.trim() || details.location || 'See event page',
+              source,
+              query: mode === 'similar' ? query : undefined,
+            });
+            if (found.length >= eventCount) break;
+          }
         }
       }
 
@@ -224,6 +235,7 @@ export function useSponsorWorkflow() {
 
       if (found.length > 0) {
         toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
+        void prescanSponsorCounts(found.slice(0, 5));
       } else {
         toast.warning(
           lastMessage ?? 'No events found. Try broader keywords, a different location, or paste event URLs directly.'
