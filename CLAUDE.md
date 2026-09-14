@@ -18,10 +18,8 @@ src/
 │   ├── EmailPreview.tsx            # Step 4: generated email drafts
 │   ├── ExportPanel.tsx             # Step 5: CSV/Excel/email-template export
 │   ├── WorkflowStepper.tsx         # Progress indicator across steps
-│   └── DataSourceIndicator.tsx     # Badge: live vs sample data
 supabase/functions/
-├── event-discovery/                # Eventbrite API → JinaAI scraping → sample data fallback
-├── meetup-discovery/               # Meetup search via JinaAI scraping
+├── meetup-discovery/               # Meetup search via JinaAI scraping (only discovery source)
 ├── sponsor-identification/         # Extract sponsors + tiers from event pages
 ├── contact-enrichment/             # Domain extraction, email variants, LinkedIn URLs
 ├── email-generation/               # AI email drafting via Lovable AI Gateway
@@ -32,8 +30,8 @@ supabase/functions/
 
 Each step feeds into the next:
 
-1. **Event Input** → `EventDetails` (name, type, industry, location, sources)
-2. **Event Discovery** → `DiscoveredEvent[]` — calls `event-discovery` and optionally `meetup-discovery`
+1. **Event Input** → `EventDetails` (name, type, industry, location)
+2. **Event Discovery** → `DiscoveredEvent[]` — calls `meetup-discovery`
 3. **Sponsor Identification + Enrichment** → `EnrichedSponsor[]` — calls `sponsor-identification` then `contact-enrichment`
 4. **Email Generation** → `EmailDraft[]` — calls `email-generation` (AI or template fallback)
 5. **Export** → downloadable files — calls `export-data`
