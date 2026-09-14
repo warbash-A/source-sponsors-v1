@@ -20,9 +20,11 @@ interface ExtractArgs {
   schema: Record<string, unknown>;
   instructions: string;
   content: string;
+  /** Optional image URLs (e.g. sponsor logos) sent alongside the text. */
+  imageUrls?: string[];
 }
 
-export async function aiExtract<T>({ name, schema, instructions, content }: ExtractArgs): Promise<T> {
+export async function aiExtract<T>({ name, schema, instructions, content, imageUrls }: ExtractArgs): Promise<T> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) throw new AiGatewayError(401, 'LOVABLE_API_KEY is not configured');
 
