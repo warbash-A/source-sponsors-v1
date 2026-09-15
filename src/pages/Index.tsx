@@ -196,7 +196,7 @@ const Index = () => {
                 completedFormats={completedExports}
               />
               <div className="mt-6 flex justify-start">
-                <Button variant="outline" onClick={handleGoBack}>
+                <Button variant="outline" onClick={() => goToStep(2)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
