@@ -39,6 +39,12 @@ const Index = () => {
 
   const similarMode = researchMode === 'similar';
 
+  // The email step (id 4) is hidden for now — the sponsor list leads straight to export.
+  const visibleSteps = steps.filter((s) => s.id !== 4);
+  const displayStep = currentStep >= 4 ? 3 : currentStep;
+  const displayMaxStep = maxStepReached >= 4 ? 3 : Math.min(maxStepReached, 2);
+  const handleVisibleStepClick = (index: number) => goToStep(index >= 3 ? 4 : index);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -73,10 +79,10 @@ const Index = () => {
         {/* Workflow Stepper */}
         <div className="mb-8">
           <WorkflowStepper
-            steps={steps}
-            currentStep={currentStep}
-            maxStepReached={maxStepReached}
-            onStepClick={goToStep}
+            steps={visibleSteps}
+            currentStep={displayStep}
+            maxStepReached={displayMaxStep}
+            onStepClick={handleVisibleStepClick}
           />
         </div>
 
@@ -152,21 +158,12 @@ const Index = () => {
                 </Button>
 
                 <Button
-                  onClick={handleGenerateEmails}
+                  onClick={handleProceedToExport}
                   disabled={sponsors.length === 0 || isLoading}
                   variant="gradient"
                 >
-                  {isLoading ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Generating Emails...
-                    </>
-                  ) : (
-                    <>
-                      Generate Outreach Emails
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
+                  Proceed to Export
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
             </div>
@@ -199,7 +196,7 @@ const Index = () => {
                 completedFormats={completedExports}
               />
               <div className="mt-6 flex justify-start">
-                <Button variant="outline" onClick={handleGoBack}>
+                <Button variant="outline" onClick={() => goToStep(2)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>

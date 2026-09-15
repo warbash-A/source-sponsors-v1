@@ -54,8 +54,10 @@ export function ExportPanel({
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {exportOptions.map(({ format, icon: Icon, title, description, details }, index) => {
+      <div className="grid gap-4 md:grid-cols-2">
+        {exportOptions
+          .filter(({ format }) => format !== 'email-templates')
+          .map(({ format, icon: Icon, title, description, details }, index) => {
           const isExporting = exportingFormat === format;
           const isComplete = completedFormats.includes(format);
 
@@ -98,7 +100,7 @@ export function ExportPanel({
                 </div>
 
                 <ul className="space-y-1">
-                  {details.map((detail, idx) => (
+                  {details.filter((d) => !/email/i.test(d)).map((detail, idx) => (
                     <li
                       key={idx}
                       className="text-xs text-muted-foreground flex items-center gap-1.5"
