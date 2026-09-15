@@ -100,7 +100,7 @@ export function ExportPanel({
                 </div>
 
                 <ul className="space-y-1">
-                  {details.map((detail, idx) => (
+                  {details.filter((d) => !/email/i.test(d)).map((detail, idx) => (
                     <li
                       key={idx}
                       className="text-xs text-muted-foreground flex items-center gap-1.5"
