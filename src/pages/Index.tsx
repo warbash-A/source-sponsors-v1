@@ -79,10 +79,10 @@ const Index = () => {
         {/* Workflow Stepper */}
         <div className="mb-8">
           <WorkflowStepper
-            steps={steps}
-            currentStep={currentStep}
-            maxStepReached={maxStepReached}
-            onStepClick={goToStep}
+            steps={visibleSteps}
+            currentStep={displayStep}
+            maxStepReached={displayMaxStep}
+            onStepClick={handleVisibleStepClick}
           />
         </div>
 
