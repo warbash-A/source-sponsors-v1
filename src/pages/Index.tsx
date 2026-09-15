@@ -39,6 +39,12 @@ const Index = () => {
 
   const similarMode = researchMode === 'similar';
 
+  // The email step (id 4) is hidden for now — the sponsor list leads straight to export.
+  const visibleSteps = steps.filter((s) => s.id !== 4);
+  const displayStep = currentStep >= 4 ? 3 : currentStep;
+  const displayMaxStep = maxStepReached >= 4 ? 3 : Math.min(maxStepReached, 2);
+  const handleVisibleStepClick = (index: number) => goToStep(index >= 3 ? 4 : index);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

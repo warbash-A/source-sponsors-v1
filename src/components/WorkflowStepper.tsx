@@ -26,7 +26,7 @@ export function WorkflowStepper({ steps, currentStep, maxStepReached = currentSt
         />
 
         {steps.map((step, index) => {
-          const Icon = stepIcons[index];
+          const Icon = stepIcons[step.id - 1] ?? stepIcons[index];
           const isComplete = step.status === 'complete';
           const isActive = step.status === 'active';
           const isPending = step.status === 'pending';
