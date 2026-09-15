@@ -158,21 +158,12 @@ const Index = () => {
                 </Button>
 
                 <Button
-                  onClick={handleGenerateEmails}
+                  onClick={handleProceedToExport}
                   disabled={sponsors.length === 0 || isLoading}
                   variant="gradient"
                 >
-                  {isLoading ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Generating Emails...
-                    </>
-                  ) : (
-                    <>
-                      Generate Outreach Emails
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
+                  Proceed to Export
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
             </div>
