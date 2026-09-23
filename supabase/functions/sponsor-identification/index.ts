@@ -96,7 +96,8 @@ serve(async (req) => {
           .join('\n\n')
           .substring(0, 45000);
 
-        let extracted: ExtractedSponsors;
+        let extracted: ExtractedSponsors = { sponsors: [] };
+        let aiFailed = false;
         try {
           extracted = await aiExtract<ExtractedSponsors>({
             name: 'event_sponsors',
@@ -106,6 +107,7 @@ serve(async (req) => {
           });
         } catch (err) {
           if (err instanceof AiGatewayError) {
+            aiFailed = true;
             aiBlockedMessage =
               err.status === 402
                 ? 'AI credits are exhausted, so sponsor extraction stopped.'
@@ -113,29 +115,40 @@ serve(async (req) => {
                   ? 'Rate limited while reading sponsor pages.'
                   : 'Sponsor extraction failed.';
             console.error('AI extraction blocked:', err.status, err.message);
-            eventsWithoutSponsors.push(event.name);
-            if (err.status === 402 || err.status === 403) break;
-            continue;
+            // Out of credits: nothing further will work, so stop entirely.
+            if (err.status === 402 || err.status === 403) {
+              eventsWithoutSponsors.push(event.name);
+              break;
+            }
+            // Otherwise keep going — the logo wall and data endpoints may still work.
+          } else {
+            throw err;
           }
-          throw err;
         }
+
 
         console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
         let found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
 
         // Many sponsor pages show logos as images with little or no text, so always
         // read the logo wall as well and merge what it finds with the text results.
-        const logos = await collectLogoUrls(pages);
+        const logos = aiFailed ? [] : await collectLogoUrls(pages);
+
         if (logos.length > 0) {
           console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
           const fromLogos = await readLogosInBatches(logos, event.name);
           console.log(`Logo vision returned ${fromLogos.length} sponsors for ${event.name}`);
-          const seen = new Set(found.map((s) => s.name.trim().toLowerCase()));
-          for (const s of fromLogos) {
-            const key = s.name.trim().toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            found.push(s);
+          found = mergeSponsors(found, fromLogos);
+        }
+
+        // Some sponsor pages render their logo walls entirely in the browser, so neither
+        // the reader text nor the HTML holds any sponsor. Those pages usually load the
+        // list from a separate data endpoint — read it directly.
+        if (found.length === 0) {
+          const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
+          if (fromData.length > 0) {
+            console.log(`Data endpoints returned ${fromData.length} sponsors for ${event.name}`);
+            found = mergeSponsors(found, fromData);
           }
         }
 
@@ -143,6 +156,7 @@ serve(async (req) => {
           eventsWithoutSponsors.push(event.name);
           continue;
         }
+
 
         for (const s of found) {
           const name = s.name.trim();
@@ -184,7 +198,7 @@ serve(async (req) => {
       totalFound: sponsors.length,
       eventsWithoutSponsors,
       status: sponsors.length > 0 ? 'ok' : 'no_results',
-      message: aiBlockedMessage,
+      message: sponsors.length > 0 ? undefined : aiBlockedMessage,
     });
   } catch (error) {
     console.error('Error in sponsor-identification:', error);
@@ -378,6 +392,104 @@ async function fetchHtml(url: string): Promise<string | null> {
     return null;
   }
 }
+
+type Found = { name: string; tier: string; website: string };
+
+/** Merges two sponsor lists, keeping the first occurrence of each name. */
+function mergeSponsors(base: Found[], extra: Found[]): Found[] {
+  const out = [...base];
+  const seen = new Set(out.map((s) => s.name.trim().toLowerCase()));
+  for (const s of extra) {
+    const key = s.name.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+const TIER_ORDER: Sponsor['tier'][] = ['platinum', 'gold', 'silver', 'bronze'];
+
+/**
+ * Reads sponsor lists that the page loads from a separate data endpoint after render
+ * (common on enterprise CMS sites such as IBM's, where the logo wall is empty in HTML).
+ * Each gallery block carries a data-endpoint; its JSON model holds the sponsor names.
+ * The heading above each block gives the tier, ranked in the order the blocks appear.
+ */
+async function collectSponsorsFromDataEndpoints(pageUrl: string): Promise<Found[]> {
+  const html = await fetchHtml(pageUrl);
+  if (!html) return [];
+
+  let origin = '';
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    return [];
+  }
+
+  const blocks = html.split(/data-component-name=["']logo-gallery["']/i).slice(1);
+  if (blocks.length === 0) return [];
+
+  const groups: { heading: string; endpoint: string }[] = [];
+  for (const block of blocks.slice(0, 12)) {
+    const endpoint = block.match(/data-endpoint=["']([^"']+)["']/)?.[1];
+    if (!endpoint) continue;
+    const headingHtml = block.match(/<h[1-4][^>]*>([\s\S]{0,400}?)<\/h[1-4]>/i)?.[1] ?? '';
+    const heading = headingHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    groups.push({ heading, endpoint });
+  }
+  if (groups.length === 0) return [];
+
+  // Rank only the groups that actually read as sponsor tiers; other galleries
+  // (side programmes, travel partners) still count as sponsors, just untiered.
+  const tierGroups = groups.filter((g) => /sponsor|partner|supporter|exhibitor/i.test(g.heading));
+
+  const results = await Promise.all(groups.map(async (group) => {
+    const url = endpointUrl(origin, group.endpoint);
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SponsorScout/1.0)', Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      const rank = tierGroups.indexOf(group);
+      const tier = rank >= 0 ? (TIER_ORDER[Math.min(rank, TIER_ORDER.length - 1)]) : 'unknown';
+      return collectNames(data).map((name) => ({ name, tier, website: '' }));
+    } catch (err) {
+      console.log('Data endpoint failed', url, err instanceof Error ? err.message : err);
+      return [];
+    }
+  }));
+
+  return results.flat().filter((s) => isLikelyCompany(s.name));
+}
+
+function endpointUrl(origin: string, endpoint: string): string {
+  const path = endpoint.startsWith('http') ? endpoint : `${origin}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  return /\.json($|\?)/.test(path) ? path : `${path}.model.json`;
+}
+
+/** Pulls display names out of an arbitrary JSON payload of logo/sponsor entries. */
+function collectNames(data: unknown, depth = 0): string[] {
+  if (depth > 6 || data === null || typeof data !== 'object') return [];
+  if (Array.isArray(data)) return data.flatMap((item) => collectNames(item, depth + 1));
+
+  const record = data as Record<string, unknown>;
+  const names: string[] = [];
+  for (const key of ['title', 'name', 'companyName', 'logoImageAltText', 'alt']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      names.push(value.replace(/\s+logo$/i, '').trim());
+      break;
+    }
+  }
+  if (names.length > 0) return names;
+
+  return Object.values(record).flatMap((value) => collectNames(value, depth + 1));
+}
+
+
 
 
 /** Rejects obvious non-company strings the model may still return. */
