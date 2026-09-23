@@ -96,7 +96,8 @@ serve(async (req) => {
           .join('\n\n')
           .substring(0, 45000);
 
-        let extracted: ExtractedSponsors;
+        let extracted: ExtractedSponsors = { sponsors: [] };
+        let aiFailed = false;
         try {
           extracted = await aiExtract<ExtractedSponsors>({
             name: 'event_sponsors',
@@ -106,6 +107,7 @@ serve(async (req) => {
           });
         } catch (err) {
           if (err instanceof AiGatewayError) {
+            aiFailed = true;
             aiBlockedMessage =
               err.status === 402
                 ? 'AI credits are exhausted, so sponsor extraction stopped.'
@@ -113,12 +115,17 @@ serve(async (req) => {
                   ? 'Rate limited while reading sponsor pages.'
                   : 'Sponsor extraction failed.';
             console.error('AI extraction blocked:', err.status, err.message);
-            eventsWithoutSponsors.push(event.name);
-            if (err.status === 402 || err.status === 403) break;
-            continue;
+            // Out of credits: nothing further will work, so stop entirely.
+            if (err.status === 402 || err.status === 403) {
+              eventsWithoutSponsors.push(event.name);
+              break;
+            }
+            // Otherwise keep going — the logo wall and data endpoints may still work.
+          } else {
+            throw err;
           }
-          throw err;
         }
+
 
         console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
         let found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
