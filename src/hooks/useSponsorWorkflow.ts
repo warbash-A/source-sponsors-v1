@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import type {
   EventDetails,
@@ -81,6 +82,22 @@ function writeToStorage(data: PersistedWorkflow): void {
   }
 }
 
+// Identifies this browser's saved workflow in the database, so results can be
+// restored after a refresh.
+const WORKSPACE_KEY = 'sponsorscout_workspace_id';
+
+function readWorkspaceId(): string {
+  try {
+    const existing = localStorage.getItem(WORKSPACE_KEY);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem(WORKSPACE_KEY, id);
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const initialSteps: WorkflowStep[] = [
@@ -120,6 +137,8 @@ export function useSponsorWorkflow() {
   const [researchMode, setResearchMode] = useState<'mine' | 'similar'>(stored.researchMode ?? 'mine');
   const [searchQueries, setSearchQueries] = useState<string[]>(stored.searchQueries ?? []);
   const [isPrescanning, setIsPrescanning] = useState(false);
+  const workspaceId = readWorkspaceId();
+  const [isCloudSynced, setIsCloudSynced] = useState(false);
 
   useEffect(() => {
     setMaxStepReached((prev) => (currentStep > prev ? currentStep : prev));
@@ -134,6 +153,63 @@ export function useSponsorWorkflow() {
   useEffect(() => {
     writeToStorage({ eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries });
   }, [eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries]);
+
+  // Restore the saved workflow from the database once when the app loads.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('sponsor_workflows')
+          .select('state')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+        if (!cancelled && !error && data?.state && typeof data.state === 'object') {
+          const s = data.state as unknown as PersistedWorkflow;
+          setEventDetails(s.eventDetails ?? null);
+          setEvents(Array.isArray(s.events) ? s.events : []);
+          setSelectedEventIds(Array.isArray(s.selectedEventIds) ? s.selectedEventIds : []);
+          setSponsors(Array.isArray(s.sponsors) ? s.sponsors : []);
+          setResearchMode(s.researchMode === 'similar' ? 'similar' : 'mine');
+          setSearchQueries(Array.isArray(s.searchQueries) ? s.searchQueries : []);
+          const step = typeof s.currentStep === 'number' && Number.isFinite(s.currentStep)
+            ? Math.max(0, Math.min(initialSteps.length - 1, Math.round(s.currentStep)))
+            : 0;
+          setCurrentStep(step);
+          setMaxStepReached(step);
+          setSteps(deriveSteps(step));
+        }
+      } catch (err) {
+        console.error('Workflow restore error:', err);
+      } finally {
+        if (!cancelled) setIsCloudSynced(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
+  // Mirror every workflow change to the database (debounced) so it survives refreshes.
+  useEffect(() => {
+    if (!isCloudSynced) return;
+    const timer = setTimeout(() => {
+      void supabase
+        .from('sponsor_workflows')
+        .upsert(
+          {
+            workspace_id: workspaceId,
+            state: {
+              eventDetails, events, selectedEventIds, sponsors,
+              currentStep, researchMode, searchQueries,
+            } as unknown as Json,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'workspace_id' },
+        );
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [isCloudSynced, workspaceId, eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries]);
 
   /**
    * Reads sponsor pages for every discovered event, in small batches, so the user can
@@ -586,6 +662,7 @@ export function useSponsorWorkflow() {
 
   const resetWorkflow = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    void supabase.from('sponsor_workflows').delete().eq('workspace_id', workspaceId);
     setCurrentStep(0);
     setSteps(initialSteps);
     setEventDetails(null);

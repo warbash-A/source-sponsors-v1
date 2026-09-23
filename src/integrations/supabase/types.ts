@@ -14,7 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      sponsor_workflows: {
+        Row: {
+          created_at: string
+          id: string
+          state: Json
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          state: Json
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          state?: Json
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
