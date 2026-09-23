@@ -99,7 +99,6 @@ function generateWorkbook(data: ExportRequest['data']): string {
     LinkedIn: s.linkedinUrl || '',
     Events: Array.isArray(s.events) ? s.events.join('; ') : '',
     'Event Count': s.eventCount ?? (Array.isArray(s.events) ? s.events.length : 1),
-    Status: s.enrichmentStatus || 'unknown',
     'Found On': s.sourceUrl || '',
   }));
 
@@ -124,7 +123,7 @@ function generateCSV(data: ExportRequest['data']): string {
   // Sponsors section
   if (data.sponsors && data.sponsors.length > 0) {
     lines.push('=== SPONSORS ===');
-    lines.push('Name,Tier,Website,Emails,LinkedIn,Event Count,Status');
+    lines.push('Name,Tier,Website,Emails,LinkedIn,Event Count');
     
     for (const sponsor of data.sponsors) {
       const row = [
@@ -134,7 +133,6 @@ function generateCSV(data: ExportRequest['data']): string {
         escapeCsvField((sponsor.emails || []).join('; ')),
         escapeCsvField(sponsor.linkedinUrl || ''),
         sponsor.eventCount || 1,
-        escapeCsvField(sponsor.enrichmentStatus || 'unknown'),
       ];
       lines.push(row.join(','));
     }
