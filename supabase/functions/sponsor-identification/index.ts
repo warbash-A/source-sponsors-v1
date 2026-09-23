@@ -130,20 +130,28 @@ serve(async (req) => {
         console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
         let found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
 
-        // Many sponsor pages show logos as images with little or no text, so always
-        // read the logo wall as well and merge what it finds with the text results.
-        const logos = aiFailed ? [] : await collectLogoUrls(pages);
+        // Deterministic layers run on every event, not only as a fallback: modern
+        // conference sites hydrate their sponsor walls from JSON or render them as
+        // bare logo markup the reader never sees.
+        const htmlPages = (await Promise.all(
+          pages.slice(0, 2).map(async (p) => ({ url: p.url, html: await fetchHtml(p.url) })),
+        )).filter((p): p is { url: string; html: string } => Boolean(p.html));
 
-        if (logos.length > 0) {
-          console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
-          const fromLogos = await readLogosInBatches(logos, event.name);
-          console.log(`Logo vision returned ${fromLogos.length} sponsors for ${event.name}`);
-          found = mergeSponsors(found, fromLogos);
+        for (const { url, html } of htmlPages) {
+          const fromJson = extractFromEmbeddedJson(html).filter((s) => isLikelyCompany(s.name));
+          if (fromJson.length > 0) {
+            console.log(`Embedded JSON returned ${fromJson.length} sponsors from ${url}`);
+            found = mergeSponsors(found, fromJson);
+          }
+          const fromHtml = extractFromHtmlSections(html).filter((s) => isLikelyCompany(s.name));
+          if (fromHtml.length > 0) {
+            console.log(`HTML sponsor sections returned ${fromHtml.length} sponsors from ${url}`);
+            found = mergeSponsors(found, fromHtml);
+          }
         }
 
-        // Some sponsor pages render their logo walls entirely in the browser, so neither
-        // the reader text nor the HTML holds any sponsor. Those pages usually load the
-        // list from a separate data endpoint — read it directly.
+        // Some sponsor pages load their logo wall from a separate data endpoint
+        // (enterprise CMS such as Adobe Experience Manager) — read it directly.
         if (found.length === 0) {
           const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
           if (fromData.length > 0) {
@@ -152,10 +160,22 @@ serve(async (req) => {
           }
         }
 
+        // Last resort: read the logo images themselves with vision.
+        if (found.length === 0 && !aiFailed) {
+          const logos = await collectLogoUrls(pages);
+          if (logos.length > 0) {
+            console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
+            const fromLogos = await readLogosInBatches(logos, event.name);
+            console.log(`Logo vision returned ${fromLogos.length} sponsors for ${event.name}`);
+            found = mergeSponsors(found, fromLogos);
+          }
+        }
+
         if (found.length === 0) {
           eventsWithoutSponsors.push(event.name);
           continue;
         }
+
 
 
         for (const s of found) {
