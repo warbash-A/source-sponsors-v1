@@ -181,7 +181,7 @@ serve(async (req) => {
 
         for (const s of found) {
           const name = s.name.trim();
-          const key = name.toLowerCase();
+          const key = nameKey(name);
           const tier = (VALID_TIERS.includes(s.tier) ? s.tier : 'unknown') as Sponsor['tier'];
           const existing = byKey.get(key);
           if (existing) {
