@@ -153,12 +153,10 @@ serve(async (req) => {
 
         // Some sponsor pages load their logo wall from a separate data endpoint
         // (enterprise CMS such as Adobe Experience Manager) — read it directly.
-        if (found.length === 0) {
-          const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
-          if (fromData.length > 0) {
-            console.log(`Data endpoints returned ${fromData.length} sponsors for ${event.name}`);
-            found = mergeSponsors(found, fromData);
-          }
+        const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
+        if (fromData.length > 0) {
+          console.log(`Data endpoints returned ${fromData.length} sponsors for ${event.name}`);
+          found = mergeSponsors(found, fromData);
         }
 
         // Last resort: read the logo images themselves with vision.
