@@ -135,7 +135,7 @@ serve(async (req) => {
         // conference sites hydrate their sponsor walls from JSON or render them as
         // bare logo markup the reader never sees.
         const htmlPages = (await Promise.all(
-          pages.slice(0, 2).map(async (p) => ({ url: p.url, html: await fetchHtml(p.url) })),
+          pages.slice(0, 3).map(async (p) => ({ url: p.url, html: await fetchHtml(p.url) })),
         )).filter((p): p is { url: string; html: string } => Boolean(p.html));
 
         for (const { url, html } of htmlPages) {
