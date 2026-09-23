@@ -195,6 +195,7 @@ export function useSponsorWorkflow() {
     console.log('[cloud-sync] effect fired, synced =', isCloudSynced);
     if (!isCloudSynced) return;
     const timer = setTimeout(() => {
+      console.log('[cloud-sync] saving to database');
       void supabase
         .from('sponsor_workflows')
         .upsert(
