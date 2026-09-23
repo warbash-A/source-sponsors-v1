@@ -207,21 +207,32 @@ export function extractFromHtmlSections(html: string, pageUrl = ''): Found[] {
 
     // Only anchors that wrap a logo image count — plain text links inside a
     // sponsor block are navigation, categories or "read more" links.
-    for (const a of chunk.matchAll(/<a[^>]+href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi)) {
-      const href = a[1];
+    // Anchors inside a sponsor block: a wrapped logo image, or a text sponsor
+    // card (common on conference directories, where sponsors are text links).
+    for (const a of chunk.matchAll(/<a[^>]+href=["']([^"'#][^"']*)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi)) {
+      const rawHref = a[1];
       const inner = a[2];
-      if (!/<img/i.test(inner)) continue;
+      let href = '';
+      try {
+        href = new URL(rawHref, pageUrl || undefined).toString();
+      } catch { /* unresolvable relative link without a page URL */ }
       let host = '';
       try {
         host = new URL(href).hostname.replace(/^www\./, '').toLowerCase();
       } catch { /* ignore */ }
+      const hasImg = /<img/i.test(inner);
       const alt = inner.match(/alt=["']([^"']+)["']/i)?.[1]
         ?? inner.match(/title=["']([^"']+)["']/i)?.[1]
         ?? '';
+      const text = cleanName(inner.replace(/<[^>]+>/g, ' '));
       // A link back to the event's own site tells us nothing about the sponsor.
-      const fromHref = host && host !== pageHost ? brandFromUrl(href) : '';
-      const name = cleanName(alt) || fromHref;
+      const external = Boolean(host) && host !== pageHost;
+      const fromHref = external ? brandFromUrl(href) : '';
+      const name = hasImg ? (cleanName(alt) || fromHref) : text;
       if (!name || SKIP_IMG.test(name)) continue;
+      // Text links only count when they look like a sponsor card: an external
+      // link, or an internal company/sponsor profile path.
+      if (!hasImg && !external && !/\/(compan|sponsor|partner|exhibitor|organi)/i.test(rawHref)) continue;
       out.push({ name, tier, website: fromHref ? href : '' });
     }
 
@@ -236,6 +247,7 @@ export function extractFromHtmlSections(html: string, pageUrl = ''): Found[] {
       if (!name || SKIP_IMG.test(name)) continue;
       out.push({ name, tier, website: '' });
     }
+
   }
 
   return out;
