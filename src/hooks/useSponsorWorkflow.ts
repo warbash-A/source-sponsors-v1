@@ -81,6 +81,22 @@ function writeToStorage(data: PersistedWorkflow): void {
   }
 }
 
+// Identifies this browser's saved workflow in the database, so results can be
+// restored after a refresh.
+const WORKSPACE_KEY = 'sponsorscout_workspace_id';
+
+function readWorkspaceId(): string {
+  try {
+    const existing = localStorage.getItem(WORKSPACE_KEY);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem(WORKSPACE_KEY, id);
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const initialSteps: WorkflowStep[] = [
