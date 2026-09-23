@@ -662,6 +662,7 @@ export function useSponsorWorkflow() {
 
   const resetWorkflow = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    void supabase.from('sponsor_workflows').delete().eq('workspace_id', workspaceId);
     setCurrentStep(0);
     setSteps(initialSteps);
     setEventDetails(null);
