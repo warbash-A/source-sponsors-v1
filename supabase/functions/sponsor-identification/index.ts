@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, json, generateId, readPage } from "../_shared/scrape.ts";
 import { aiExtract, AiGatewayError } from "../_shared/ai-extract.ts";
+import { extractFromEmbeddedJson, extractFromHtmlSections } from "./structured.ts";
 
 interface EventInput {
   id: string;
@@ -130,25 +131,42 @@ serve(async (req) => {
         console.log(`AI returned ${(extracted.sponsors ?? []).length} sponsors for ${event.name} from ${pages.length} page(s)`);
         let found = (extracted.sponsors ?? []).filter((s) => isLikelyCompany(s.name));
 
-        // Many sponsor pages show logos as images with little or no text, so always
-        // read the logo wall as well and merge what it finds with the text results.
-        const logos = aiFailed ? [] : await collectLogoUrls(pages);
+        // Deterministic layers run on every event, not only as a fallback: modern
+        // conference sites hydrate their sponsor walls from JSON or render them as
+        // bare logo markup the reader never sees.
+        const htmlPages = (await Promise.all(
+          pages.slice(0, 2).map(async (p) => ({ url: p.url, html: await fetchHtml(p.url) })),
+        )).filter((p): p is { url: string; html: string } => Boolean(p.html));
 
-        if (logos.length > 0) {
-          console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
-          const fromLogos = await readLogosInBatches(logos, event.name);
-          console.log(`Logo vision returned ${fromLogos.length} sponsors for ${event.name}`);
-          found = mergeSponsors(found, fromLogos);
+        for (const { url, html } of htmlPages) {
+          const fromJson = extractFromEmbeddedJson(html).filter((s) => isLikelyCompany(s.name));
+          if (fromJson.length > 0) {
+            console.log(`Embedded JSON returned ${fromJson.length} sponsors from ${url}`);
+            found = mergeSponsors(found, fromJson);
+          }
+          const fromHtml = extractFromHtmlSections(html, url).filter((s) => isLikelyCompany(s.name));
+          if (fromHtml.length > 0) {
+            console.log(`HTML sponsor sections returned ${fromHtml.length} sponsors from ${url}`);
+            found = mergeSponsors(found, fromHtml);
+          }
         }
 
-        // Some sponsor pages render their logo walls entirely in the browser, so neither
-        // the reader text nor the HTML holds any sponsor. Those pages usually load the
-        // list from a separate data endpoint — read it directly.
-        if (found.length === 0) {
-          const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
-          if (fromData.length > 0) {
-            console.log(`Data endpoints returned ${fromData.length} sponsors for ${event.name}`);
-            found = mergeSponsors(found, fromData);
+        // Some sponsor pages load their logo wall from a separate data endpoint
+        // (enterprise CMS such as Adobe Experience Manager) — read it directly.
+        const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
+        if (fromData.length > 0) {
+          console.log(`Data endpoints returned ${fromData.length} sponsors for ${event.name}`);
+          found = mergeSponsors(found, fromData);
+        }
+
+        // Last resort: read the logo images themselves with vision.
+        if (found.length === 0 && !aiFailed) {
+          const logos = await collectLogoUrls(pages);
+          if (logos.length > 0) {
+            console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
+            const fromLogos = await readLogosInBatches(logos, event.name);
+            console.log(`Logo vision returned ${fromLogos.length} sponsors for ${event.name}`);
+            found = mergeSponsors(found, fromLogos);
           }
         }
 
@@ -158,9 +176,10 @@ serve(async (req) => {
         }
 
 
+
         for (const s of found) {
           const name = s.name.trim();
-          const key = name.toLowerCase();
+          const key = nameKey(name);
           const tier = (VALID_TIERS.includes(s.tier) ? s.tier : 'unknown') as Sponsor['tier'];
           const existing = byKey.get(key);
           if (existing) {
@@ -212,7 +231,10 @@ serve(async (req) => {
   }
 });
 
-const SPONSOR_SLUGS = ['sponsors', 'sponsorship', 'partners', 'our-sponsors', 'sponsors-partners', 'exhibitors'];
+const SPONSOR_SLUGS = [
+  'sponsors', 'sponsorship', 'partners', 'our-sponsors', 'sponsors-partners',
+  'exhibitors', 'partners-sponsors', 'sponsors-exhibitors', 'supporters', 'prospectus',
+];
 
 interface Page { url: string; content: string }
 
@@ -395,15 +417,34 @@ async function fetchHtml(url: string): Promise<string | null> {
 
 type Found = { name: string; tier: string; website: string };
 
-/** Merges two sponsor lists, keeping the first occurrence of each name. */
+/** "Google Cloud, Inc." and "google cloud" collapse onto the same key. */
+function nameKey(raw: string): string {
+  return (raw ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\b(inc|llc|ltd|limited|corp|corporation|gmbh|plc|co|sa|bv)\b\.?/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
+const TIER_RANK: Record<string, number> = { platinum: 4, gold: 3, silver: 2, bronze: 1, unknown: 0 };
+
+/** Merges sponsor lists, keeping the best tier and any website found for a name. */
 function mergeSponsors(base: Found[], extra: Found[]): Found[] {
-  const out = [...base];
-  const seen = new Set(out.map((s) => s.name.trim().toLowerCase()));
-  for (const s of extra) {
-    const key = s.name.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(s);
+  const out: Found[] = [];
+  const index = new Map<string, Found>();
+  for (const s of [...base, ...extra]) {
+    const key = nameKey(s.name);
+    if (!key) continue;
+    const existing = index.get(key);
+    if (!existing) {
+      const copy = { ...s, name: s.name.trim() };
+      index.set(key, copy);
+      out.push(copy);
+      continue;
+    }
+    if ((TIER_RANK[s.tier] ?? 0) > (TIER_RANK[existing.tier] ?? 0)) existing.tier = s.tier;
+    if (!existing.website && s.website) existing.website = s.website;
   }
   return out;
 }
@@ -499,6 +540,16 @@ function isLikelyCompany(raw: string): boolean {
   if (/^\d+$/.test(name)) return false;
   if (/^(image|photo|logo|icon|link|button)\b/i.test(name)) return false;
   if (/(privacy|cookie|terms|copyright|read more|learn more|sign up|log in|contact us)/i.test(name)) return false;
+  // Section labels and dates picked up from a sponsor block are not sponsors.
+  if (/^(sponsors?|partners?|exhibitors?|supporters?|announcements?|news|blog|home|menu|events?|tickets?|speakers?|schedule|about|our sponsors|become a sponsor)$/i.test(name)) return false;
+  if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d/i.test(name)) return false;
+  if (/\b(19|20)\d{2}\b/.test(name) && /\d{1,2}/.test(name.replace(/(19|20)\d{2}/, ''))) return false;
+
+  // Descriptive alt text ("An abstract form made of coloured layers") is not a sponsor.
+  const words = name.split(/\s+/);
+  if (words.length > 5) return false;
+  if (/^(a|an|the|our|this|view|click|download|watch|register|explore)\b/i.test(name) && words.length > 2) return false;
+  if (/\b(made of|background|illustration|abstract|graphic|artwork|hero|thumbnail|screenshot)\b/i.test(name)) return false;
 
   // Two capitalised words with no company marker is usually a person's name.
   const personLike = /^[A-Z][a-z]{1,15}\s[A-Z][a-z]{1,15}$/.test(name);
