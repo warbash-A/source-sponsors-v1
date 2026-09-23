@@ -205,8 +205,6 @@ export function extractFromHtmlSections(html: string, pageUrl = ''): Found[] {
     const chunk = html.slice(index, Math.min(end, index + 12000));
     const tier = tierFromHeading(label, sponsorRank);
 
-    // Only anchors that wrap a logo image count — plain text links inside a
-    // sponsor block are navigation, categories or "read more" links.
     // Anchors inside a sponsor block: a wrapped logo image, or a text sponsor
     // card (common on conference directories, where sponsors are text links).
     for (const a of chunk.matchAll(/<a[^>]+href=["']([^"'#][^"']*)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi)) {
