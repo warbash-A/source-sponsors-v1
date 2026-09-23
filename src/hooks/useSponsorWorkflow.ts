@@ -192,7 +192,6 @@ export function useSponsorWorkflow() {
 
   // Mirror every workflow change to the database (debounced) so it survives refreshes.
   useEffect(() => {
-    console.log('[cloud-sync] effect fired, synced =', isCloudSynced);
     if (!isCloudSynced) return;
     const timer = setTimeout(() => {
       void supabase
