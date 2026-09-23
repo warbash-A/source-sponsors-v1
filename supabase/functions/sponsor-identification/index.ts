@@ -540,6 +540,10 @@ function isLikelyCompany(raw: string): boolean {
   if (/^\d+$/.test(name)) return false;
   if (/^(image|photo|logo|icon|link|button)\b/i.test(name)) return false;
   if (/(privacy|cookie|terms|copyright|read more|learn more|sign up|log in|contact us)/i.test(name)) return false;
+  // Section labels and dates picked up from a sponsor block are not sponsors.
+  if (/^(sponsors?|partners?|exhibitors?|supporters?|announcements?|news|blog|home|menu|events?|tickets?|speakers?|schedule|about|our sponsors|become a sponsor)$/i.test(name)) return false;
+  if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d/i.test(name)) return false;
+  if (/\b(19|20)\d{2}\b/.test(name) && /\d{1,2}/.test(name.replace(/(19|20)\d{2}/, ''))) return false;
 
   // Descriptive alt text ("An abstract form made of coloured layers") is not a sponsor.
   const words = name.split(/\s+/);
