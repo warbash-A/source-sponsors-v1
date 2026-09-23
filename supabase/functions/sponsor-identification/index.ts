@@ -541,6 +541,12 @@ function isLikelyCompany(raw: string): boolean {
   if (/^(image|photo|logo|icon|link|button)\b/i.test(name)) return false;
   if (/(privacy|cookie|terms|copyright|read more|learn more|sign up|log in|contact us)/i.test(name)) return false;
 
+  // Descriptive alt text ("An abstract form made of coloured layers") is not a sponsor.
+  const words = name.split(/\s+/);
+  if (words.length > 5) return false;
+  if (/^(a|an|the|our|this|view|click|download|watch|register|explore)\b/i.test(name) && words.length > 2) return false;
+  if (/\b(made of|background|illustration|abstract|graphic|artwork|hero|thumbnail|screenshot)\b/i.test(name)) return false;
+
   // Two capitalised words with no company marker is usually a person's name.
   const personLike = /^[A-Z][a-z]{1,15}\s[A-Z][a-z]{1,15}$/.test(name);
   const companyMarker = /(inc|llc|ltd|corp|gmbh|co|group|labs|technologies|systems|ventures|capital|partners|media|bank|studio|software|solutions|university|foundation|institute)\b/i.test(name);
