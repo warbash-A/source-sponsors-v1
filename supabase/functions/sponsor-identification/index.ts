@@ -563,6 +563,8 @@ function isLikelyCompany(raw: string): boolean {
   if (/^\d+$/.test(name)) return false;
   if (/^(image|photo|logo|icon|link|button)\b/i.test(name)) return false;
   if (/(privacy|cookie|terms|copyright|read more|learn more|sign up|log in|contact us)/i.test(name)) return false;
+  // Call-to-action links inside a sponsor block are not sponsors.
+  if (/^(visit|claim|see|view|join|apply|get|become|submit|learn|buy|book|add|browse|explore|share|save|find|show|start|sponsor|advertise|subscribe)\b/i.test(name)) return false;
   // Section labels and dates picked up from a sponsor block are not sponsors.
   if (/^(sponsors?|partners?|exhibitors?|supporters?|announcements?|news|blog|home|menu|events?|tickets?|speakers?|schedule|about|our sponsors|become a sponsor)$/i.test(name)) return false;
   if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d/i.test(name)) return false;
