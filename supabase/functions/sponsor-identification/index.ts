@@ -144,7 +144,7 @@ serve(async (req) => {
             console.log(`Embedded JSON returned ${fromJson.length} sponsors from ${url}`);
             found = mergeSponsors(found, fromJson);
           }
-          const fromHtml = extractFromHtmlSections(html).filter((s) => isLikelyCompany(s.name));
+          const fromHtml = extractFromHtmlSections(html, url).filter((s) => isLikelyCompany(s.name));
           if (fromHtml.length > 0) {
             console.log(`HTML sponsor sections returned ${fromHtml.length} sponsors from ${url}`);
             found = mergeSponsors(found, fromHtml);
