@@ -19,7 +19,7 @@ export interface EventDetails {
 }
 
 /** Where a discovered event came from. */
-export type EventSource = 'meetup' | 'web' | 'directory';
+export type EventSource = 'luma' | 'web';
 
 export interface DiscoveredEvent {
   id: string;

@@ -104,8 +104,6 @@ const initialSteps: WorkflowStep[] = [
   { id: 1, name: "Input", description: "Event details", status: "active" },
   { id: 2, name: "Discovery", description: "Find events", status: "pending" },
   { id: 3, name: "Sponsors", description: "Identify sponsors", status: "pending" },
-  { id: 4, name: "Emails", description: "Generate outreach", status: "pending" },
-  { id: 5, name: "Export", description: "Download data", status: "pending" },
 ];
 
 function deriveSteps(currentStep: number): WorkflowStep[] {
@@ -308,15 +306,15 @@ export function useSponsorWorkflow() {
           if (found.length >= eventCount) break;
 
           const remaining = eventCount - found.length;
-          const { data, error } = source === 'meetup'
-            ? await supabase.functions.invoke('meetup-discovery', {
+          const { data, error } = source === 'luma'
+            ? await supabase.functions.invoke('luma-discovery', {
                 body: { keywords: query, location: details.location, eventCount: Math.min(remaining, 50) },
               })
             : await supabase.functions.invoke('web-event-discovery', {
                 body: {
                   keywords: query,
                   location: details.location,
-                  channel: source,
+                  channel: source === 'web' ? 'web' : source,
                   eventCount: Math.min(remaining, 25),
                 },
               });

@@ -4,7 +4,7 @@
  */
 
 const GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/responses';
-const MODEL = 'openai/gpt-6-astra';
+const MODEL = 'google/gemini-2.5-flash';
 
 export class AiGatewayError extends Error {
   constructor(public status: number, message: string) {

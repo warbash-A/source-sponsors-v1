@@ -4,8 +4,6 @@ import { WorkflowStepper } from "@/components/WorkflowStepper";
 import { EventInputForm } from "@/components/EventInputForm";
 import { EventDiscoveryResults } from "@/components/EventDiscoveryResults";
 import { SponsorList } from "@/components/SponsorList";
-import { EmailPreview } from "@/components/EmailPreview";
-import { ExportPanel } from "@/components/ExportPanel";
 import { useSponsorWorkflow } from "@/hooks/useSponsorWorkflow";
 
 const Index = () => {
@@ -19,18 +17,12 @@ const Index = () => {
     eventDetails,
     selectedEventIds,
     sponsors,
-    emails,
-    exportingFormat,
-    completedExports,
     researchMode,
     searchQueries,
     handleEventSubmit,
     handleAddEventFromUrl,
     handleToggleEvent,
     handleProceedToSponsors,
-    handleGenerateEmails,
-    handleProceedToExport,
-    handleExport,
     resetWorkflow,
     maxStepReached,
     goToStep,
@@ -38,12 +30,6 @@ const Index = () => {
   } = useSponsorWorkflow();
 
   const similarMode = researchMode === 'similar';
-
-  // The email step (id 4) is hidden for now — the sponsor list leads straight to export.
-  const visibleSteps = steps.filter((s) => s.id !== 4);
-  const displayStep = currentStep >= 4 ? 3 : currentStep;
-  const displayMaxStep = maxStepReached >= 4 ? 3 : Math.min(maxStepReached, 2);
-  const handleVisibleStepClick = (index: number) => goToStep(index >= 3 ? 4 : index);
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,10 +65,10 @@ const Index = () => {
         {/* Workflow Stepper */}
         <div className="mb-8">
           <WorkflowStepper
-            steps={visibleSteps}
-            currentStep={displayStep}
-            maxStepReached={displayMaxStep}
-            onStepClick={handleVisibleStepClick}
+            steps={steps}
+            currentStep={currentStep}
+            maxStepReached={maxStepReached}
+            onStepClick={goToStep}
           />
         </div>
 
@@ -151,58 +137,15 @@ const Index = () => {
           {currentStep === 2 && (
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
               <SponsorList sponsors={sponsors} showEnrichment />
-              <div className="mt-6 flex justify-between gap-3">
+              <div className="mt-6 flex justify-start gap-3">
                 <Button variant="outline" onClick={handleGoBack}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-
-                <Button
-                  onClick={handleProceedToExport}
-                  disabled={sponsors.length === 0 || isLoading}
-                  variant="gradient"
-                >
-                  Proceed to Export
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Email Generation */}
-          {currentStep === 3 && (
-            <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-              <EmailPreview emails={emails} />
-              <div className="mt-6 flex justify-between gap-3">
-                <Button variant="outline" onClick={handleGoBack}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-
-                <Button onClick={handleProceedToExport} variant="gradient">
-                  Proceed to Export
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 5: Export */}
-          {currentStep === 4 && (
-            <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-              <ExportPanel
-                onExport={handleExport}
-                exportingFormat={exportingFormat}
-                completedFormats={completedExports}
-              />
-              <div className="mt-6 flex justify-start">
-                <Button variant="outline" onClick={() => goToStep(2)}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 

@@ -58,13 +58,12 @@ const focusTagOptions = [
 
 const sourceOptions: { value: EventSource; label: string; hint: string }[] = [
   { value: "web", label: "Conference sites", hint: "Official event websites" },
-  { value: "directory", label: "Conference directories", hint: "Curated industry round-ups" },
-  { value: "meetup", label: "Meetup", hint: "Public community events" },
+  { value: "luma", label: "Luma events", hint: "Professional tech and startup events" },
 ];
 
 export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInputFormProps) {
   const [selectedSources, setSelectedSources] = useState<EventSource[]>(
-    initialValues?.sources?.length ? initialValues.sources : ["web", "meetup"]
+    initialValues?.sources?.length ? initialValues.sources : ["web", "luma"]
   );
 
   const toggleSource = (source: EventSource) => {
@@ -329,15 +328,15 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
           })}
         </div>
         <p className="text-xs text-muted-foreground">
-          Conference websites usually publish sponsor lists, so they give the richest results. You can also paste any
-          event link (including Luma) on the next screen.
+          We search conference websites and Luma for professional tech events. You can also paste any
+          event link directly on the next screen.
         </p>
       </div>
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
         <div className="flex items-center gap-2">
-          {[5, 10, 25, 50].map((count) => (
+          {[5, 10].map((count) => (
             <Button
               key={count}
               type="button"
