@@ -297,7 +297,7 @@ export function useSponsorWorkflow() {
       const seen = new Set<string>();
       const found: DiscoveredEvent[] = [];
       let lastMessage: string | undefined;
-      const sources: EventSource[] = details.sources?.length ? details.sources : ['meetup', 'web'];
+      const sources: EventSource[] = details.sources?.length ? details.sources : ['web', 'luma'];
 
       for (const query of queries) {
         if (found.length >= eventCount) break;

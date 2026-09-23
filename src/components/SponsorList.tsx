@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Building2, Globe, Linkedin, Mail, Loader2, ArrowUpDown, Filter } from "lucide-react";
+import { Building2, Globe, Linkedin, Mail, ArrowUpDown, Filter, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -14,6 +14,8 @@ import type { EnrichedSponsor } from "@/types/sponsor";
 interface SponsorListProps {
   sponsors: EnrichedSponsor[];
   showEnrichment?: boolean;
+  onDownload?: () => void;
+  isDownloading?: boolean;
 }
 
 const tierConfig = {
@@ -25,13 +27,11 @@ const tierConfig = {
 };
 
 type TierFilter = "all" | keyof typeof tierConfig;
-type StatusFilter = "all" | EnrichedSponsor["enrichmentStatus"];
-type SortOption = "name" | "tier" | "events" | "status";
+type SortOption = "name" | "tier" | "events";
 type MinEventsFilter = "all" | "2" | "3" | "4" | "5";
 
-export function SponsorList({ sponsors, showEnrichment = false }: SponsorListProps) {
+export function SponsorList({ sponsors, showEnrichment = false, onDownload, isDownloading = false }: SponsorListProps) {
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("events");
   const [sortAsc, setSortAsc] = useState(false);
   const [minEventsFilter, setMinEventsFilter] = useState<MinEventsFilter>("all");
@@ -46,11 +46,6 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
     // Apply tier filter
     if (tierFilter !== "all") {
       result = result.filter((s) => s.tier === tierFilter);
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all" && showEnrichment) {
-      result = result.filter((s) => s.enrichmentStatus === statusFilter);
     }
 
     // Apply minimum events filter
@@ -72,16 +67,12 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
         case "events":
           comparison = (b.eventCount ?? b.events.length ?? 0) - (a.eventCount ?? a.events.length ?? 0);
           break;
-        case "status":
-          const statusOrder = { complete: 1, partial: 2, processing: 3, pending: 4, failed: 5 };
-          comparison = statusOrder[a.enrichmentStatus] - statusOrder[b.enrichmentStatus];
-          break;
       }
       return sortAsc ? comparison : -comparison;
     });
 
     return result;
-  }, [sponsors, tierFilter, statusFilter, sortBy, sortAsc, minEventsFilter, showEnrichment]);
+  }, [sponsors, tierFilter, sortBy, sortAsc, minEventsFilter]);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -96,6 +87,20 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onDownload && (
+            <button
+              onClick={onDownload}
+              disabled={isDownloading || sponsors.length === 0}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded border border-primary/40 bg-primary/10 hover:bg-primary/20 text-xs font-medium text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDownloading ? (
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {isDownloading ? "Downloading..." : "Download List"}
+            </button>
+          )}
           <div className="flex items-center gap-1.5">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={tierFilter} onValueChange={(v) => setTierFilter(v as TierFilter)}>
@@ -128,21 +133,6 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
             </Select>
           )}
 
-          {showEnrichment && (
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs bg-card border-border">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
 
           <div className="flex items-center gap-1.5">
             <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -154,7 +144,6 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
                 <SelectItem value="name">Name</SelectItem>
                 <SelectItem value="tier">Tier</SelectItem>
                 <SelectItem value="events">Events</SelectItem>
-                {showEnrichment && <SelectItem value="status">Status</SelectItem>}
               </SelectContent>
             </Select>
             <button
@@ -182,14 +171,9 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
                   Events
                 </th>
                 {showEnrichment && (
-                  <>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Contacts
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Status
-                    </th>
-                  </>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Contacts
+                  </th>
                 )}
               </tr>
             </thead>
@@ -294,37 +278,15 @@ export function SponsorList({ sponsors, showEnrichment = false }: SponsorListPro
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <EnrichmentStatusBadge status={sponsor.enrichmentStatus} />
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EnrichmentStatusBadge({ status }: { status: EnrichedSponsor['enrichmentStatus'] }) {
-  const config = {
-    pending: { label: "Pending", className: "bg-muted text-muted-foreground" },
-    processing: { label: "Processing", className: "bg-primary/20 text-primary" },
-    complete: { label: "Complete", className: "bg-success/20 text-success" },
-    partial: { label: "Partial", className: "bg-warning/20 text-warning" },
-    failed: { label: "Failed", className: "bg-destructive/20 text-destructive" },
-  };
-
-  const { label, className } = config[status];
-
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium", className)}>
-      {status === 'processing' && <Loader2 className="h-3 w-3 animate-spin" />}
-      {label}
-    </span>
-  );
+                       </>
+                     )}
+                   </tr>
+                 );
+               })}
+             </tbody>
+           </table>
+         </div>
+       </div>
+     </div>
+   );
 }

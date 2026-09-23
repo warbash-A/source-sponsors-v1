@@ -24,6 +24,8 @@ const Index = () => {
     handleToggleEvent,
     handleProceedToSponsors,
     resetWorkflow,
+    handleExport,
+    exportingFormat,
     maxStepReached,
     goToStep,
     handleGoBack,
@@ -136,7 +138,12 @@ const Index = () => {
           {/* Step 3: Sponsor Identification & Enrichment */}
           {currentStep === 2 && (
             <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-              <SponsorList sponsors={sponsors} showEnrichment />
+              <SponsorList
+                sponsors={sponsors}
+                showEnrichment
+                onDownload={() => handleExport('csv')}
+                isDownloading={exportingFormat === 'csv'}
+              />
               <div className="mt-6 flex justify-start gap-3">
                 <Button variant="outline" onClick={handleGoBack}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
