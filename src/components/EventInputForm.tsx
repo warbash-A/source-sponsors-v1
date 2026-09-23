@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Building2, Tag, Sparkles, User, Briefcase, Search, Lightbulb } from "lucide-react";
+import { MapPin, Building2, Tag, Sparkles, Search, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,8 +77,6 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     type: initialValues?.type ?? "",
     industry: initialValues?.industry ?? "",
     location: initialValues?.location ?? "",
-    senderName: initialValues?.senderName ?? "",
-    senderOrganization: initialValues?.senderOrganization ?? "",
     researchMode: initialValues?.researchMode ?? "mine",
     description: initialValues?.description ?? "",
     focusTags: initialValues?.focusTags ?? [],
@@ -106,7 +104,6 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     formData.type &&
     formData.industry &&
     formData.location &&
-    formData.senderName?.trim() &&
     selectedSources.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -228,34 +225,6 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="senderName" className="flex items-center gap-2 text-foreground">
-            <User className="h-4 w-4 text-primary" />
-            Your Name
-          </Label>
-          <Input
-            id="senderName"
-            placeholder="e.g., Alex Rivera"
-            value={formData.senderName ?? ""}
-            onChange={(e) => handleChange("senderName", e.target.value)}
-            className="bg-secondary/50 border-border focus:border-primary"
-          />
-          <p className="text-xs text-muted-foreground">Used to sign your outreach emails.</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="senderOrganization" className="flex items-center gap-2 text-foreground">
-            <Briefcase className="h-4 w-4 text-primary" />
-            Your Company <span className="text-muted-foreground font-normal">(optional)</span>
-          </Label>
-          <Input
-            id="senderOrganization"
-            placeholder="e.g., SponsorScout"
-            value={formData.senderOrganization ?? ""}
-            onChange={(e) => handleChange("senderOrganization", e.target.value)}
-            className="bg-secondary/50 border-border focus:border-primary"
-          />
-        </div>
       </div>
 
       {similarMode && (
