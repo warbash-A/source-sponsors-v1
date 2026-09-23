@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, json, generateId, readPage } from "../_shared/scrape.ts";
 import { aiExtract, AiGatewayError } from "../_shared/ai-extract.ts";
+import { extractFromEmbeddedJson, extractFromHtmlSections } from "./structured.ts";
 
 interface EventInput {
   id: string;
