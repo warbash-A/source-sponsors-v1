@@ -24,7 +24,14 @@ export async function readPage(url: string, maxChars = 30000): Promise<string | 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(`https://r.jina.ai/${url}`, {
-        headers: { 'Accept': 'text/plain' },
+        headers: {
+          'Accept': 'text/plain',
+          // Give client-rendered pages time to hydrate before the markdown is taken,
+          // and keep image links so logo walls stay visible.
+          'x-timeout': '20',
+          'x-wait-for-selector': 'img',
+          'x-with-images-summary': 'true',
+        },
         signal: AbortSignal.timeout(45000),
       });
       if (res.status === 429 || res.status === 503) {
