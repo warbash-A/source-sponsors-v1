@@ -233,7 +233,10 @@ serve(async (req) => {
   }
 });
 
-const SPONSOR_SLUGS = ['sponsors', 'sponsorship', 'partners', 'our-sponsors', 'sponsors-partners', 'exhibitors'];
+const SPONSOR_SLUGS = [
+  'sponsors', 'sponsorship', 'partners', 'our-sponsors', 'sponsors-partners',
+  'exhibitors', 'partners-sponsors', 'sponsors-exhibitors', 'supporters', 'prospectus',
+];
 
 interface Page { url: string; content: string }
 
