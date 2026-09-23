@@ -195,24 +195,19 @@ export function useSponsorWorkflow() {
     console.log('[cloud-sync] effect fired, synced =', isCloudSynced);
     if (!isCloudSynced) return;
     const timer = setTimeout(() => {
-      console.log('[cloud-sync] saving to database');
-      Promise.resolve(
-        supabase
-          .from('sponsor_workflows')
-          .upsert(
-            {
-              workspace_id: workspaceId,
-              state: {
-                eventDetails, events, selectedEventIds, sponsors,
-                currentStep, researchMode, searchQueries,
-              } as unknown as Json,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'workspace_id' },
-          ),
-      )
-        .then((r: any) => console.log('[cloud-sync] save result:', r?.error ? r.error.message : 'ok'))
-        .catch((e: any) => console.log('[cloud-sync] save failed:', e?.message ?? e));
+      void supabase
+        .from('sponsor_workflows')
+        .upsert(
+          {
+            workspace_id: workspaceId,
+            state: {
+              eventDetails, events, selectedEventIds, sponsors,
+              currentStep, researchMode, searchQueries,
+            } as unknown as Json,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'workspace_id' },
+        );
     }, 1000);
     return () => clearTimeout(timer);
   }, [isCloudSynced, workspaceId, eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries]);
