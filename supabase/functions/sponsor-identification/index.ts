@@ -198,7 +198,7 @@ serve(async (req) => {
       totalFound: sponsors.length,
       eventsWithoutSponsors,
       status: sponsors.length > 0 ? 'ok' : 'no_results',
-      message: aiBlockedMessage,
+      message: sponsors.length > 0 ? undefined : aiBlockedMessage,
     });
   } catch (error) {
     console.error('Error in sponsor-identification:', error);
