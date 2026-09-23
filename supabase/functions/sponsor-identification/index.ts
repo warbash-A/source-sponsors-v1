@@ -135,7 +135,7 @@ serve(async (req) => {
         // conference sites hydrate their sponsor walls from JSON or render them as
         // bare logo markup the reader never sees.
         const htmlPages = (await Promise.all(
-          pages.slice(0, 2).map(async (p) => ({ url: p.url, html: await fetchHtml(p.url) })),
+          pages.slice(0, 3).map(async (p) => ({ url: p.url, html: await fetchHtml(p.url) })),
         )).filter((p): p is { url: string; html: string } => Boolean(p.html));
 
         for (const { url, html } of htmlPages) {
@@ -263,19 +263,27 @@ async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
   }
 
   const candidates: string[] = [];
+  const officialSites: string[] = [];
 
-  // 1. Links on the event page whose label or URL mentions sponsors/partners.
   if (home) {
     const linkPattern = /\[([^\]]{2,80})\]\((https?:\/\/[^)\s]+)\)/g;
     for (const match of home.matchAll(linkPattern)) {
       const [, label, url] = match;
       const haystack = `${label} ${url}`.toLowerCase();
-      if (!['sponsor', 'partner', 'exhibitor', 'supporter'].some((k) => haystack.includes(k))) continue;
+      let host = '';
       try {
-        if (!new URL(url).hostname.replace(/^www\./, '').endsWith(origin)) continue;
+        host = new URL(url).hostname.replace(/^www\./, '');
       } catch {
         continue;
       }
+      // 1a. Directory listings link out to the organiser's own site — follow it.
+      if (host !== origin && /(official (site|website)|visit (the )?(official|event) (site|website)|event website)/.test(label.toLowerCase())) {
+        officialSites.push(url.replace(/#.*$/, ''));
+        continue;
+      }
+      // 1b. Links on this site whose label or URL mentions sponsors/partners.
+      if (!['sponsor', 'partner', 'exhibitor', 'supporter'].some((k) => haystack.includes(k))) continue;
+      if (!host.endsWith(origin)) continue;
       candidates.push(url.replace(/#.*$/, ''));
     }
   }
@@ -286,26 +294,41 @@ async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
     candidates.push(`https://${origin}/${slug}/`);
   }
 
+  // 3. The official site found on a directory listing, plus its sponsor pages.
+  for (const site of officialSites.slice(0, 2)) {
+    candidates.push(site);
+    try {
+      const siteOrigin = new URL(site).origin;
+      for (const slug of ['sponsors', 'partners', 'sponsorship']) {
+        candidates.push(`${siteOrigin}/${slug}/`);
+      }
+    } catch { /* ignore */ }
+  }
+
   // Probe candidates in parallel — sequential probing exceeds the function time budget.
   const unique = candidates.filter((url) => {
     if (tried.has(url)) return false;
     tried.add(url);
     return true;
-  }).slice(0, 10);
+  }).slice(0, 14);
 
   const probed = await Promise.all(
     unique.map(async (url) => {
       const content = await readPage(url, 20000);
       if (!content) return null;
       if (isNotFound(content)) return null;
+      // A probed sub-path can resolve to an unrelated page on multi-event
+      // platforms — keep it only when it actually reads as a sponsor listing.
+      if (!/(sponsor|partner|exhibitor|supporter)/i.test(content.substring(0, 20000))) return null;
       console.log('Sponsor page found:', url);
       return { url, content } as Page;
     }),
   );
 
-  // Dedicated sponsor pages come first — they drive the extraction.
-  return [...probed.filter((p): p is Page => p !== null).slice(0, 2), ...pages];
+  // The real event page always leads — probed pages only supplement it.
+  return [...pages, ...probed.filter((p): p is Page => p !== null).slice(0, 3)];
 }
+
 
 function isNotFound(content: string): boolean {
   const head = content.substring(0, 600).toLowerCase();
@@ -540,6 +563,8 @@ function isLikelyCompany(raw: string): boolean {
   if (/^\d+$/.test(name)) return false;
   if (/^(image|photo|logo|icon|link|button)\b/i.test(name)) return false;
   if (/(privacy|cookie|terms|copyright|read more|learn more|sign up|log in|contact us)/i.test(name)) return false;
+  // Call-to-action links inside a sponsor block are not sponsors.
+  if (/^(visit|claim|see|view|join|apply|get|become|submit|learn|buy|book|add|browse|explore|share|save|find|show|start|sponsor|advertise|subscribe)\b/i.test(name)) return false;
   // Section labels and dates picked up from a sponsor block are not sponsors.
   if (/^(sponsors?|partners?|exhibitors?|supporters?|announcements?|news|blog|home|menu|events?|tickets?|speakers?|schedule|about|our sponsors|become a sponsor)$/i.test(name)) return false;
   if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d/i.test(name)) return false;
