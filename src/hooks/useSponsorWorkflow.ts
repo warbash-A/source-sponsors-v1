@@ -199,7 +199,10 @@ export function useSponsorWorkflow() {
         .upsert(
           {
             workspace_id: workspaceId,
-            state: { eventDetails, events, selectedEventIds, sponsors, currentStep, researchMode, searchQueries },
+            state: {
+              eventDetails, events, selectedEventIds, sponsors,
+              currentStep, researchMode, searchQueries,
+            } as unknown as Json,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'workspace_id' },
