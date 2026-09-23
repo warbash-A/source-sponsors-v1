@@ -416,15 +416,34 @@ async function fetchHtml(url: string): Promise<string | null> {
 
 type Found = { name: string; tier: string; website: string };
 
-/** Merges two sponsor lists, keeping the first occurrence of each name. */
+/** "Google Cloud, Inc." and "google cloud" collapse onto the same key. */
+function nameKey(raw: string): string {
+  return (raw ?? '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\b(inc|llc|ltd|limited|corp|corporation|gmbh|plc|co|sa|bv)\b\.?/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
+const TIER_RANK: Record<string, number> = { platinum: 4, gold: 3, silver: 2, bronze: 1, unknown: 0 };
+
+/** Merges sponsor lists, keeping the best tier and any website found for a name. */
 function mergeSponsors(base: Found[], extra: Found[]): Found[] {
-  const out = [...base];
-  const seen = new Set(out.map((s) => s.name.trim().toLowerCase()));
-  for (const s of extra) {
-    const key = s.name.trim().toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(s);
+  const out: Found[] = [];
+  const index = new Map<string, Found>();
+  for (const s of [...base, ...extra]) {
+    const key = nameKey(s.name);
+    if (!key) continue;
+    const existing = index.get(key);
+    if (!existing) {
+      const copy = { ...s, name: s.name.trim() };
+      index.set(key, copy);
+      out.push(copy);
+      continue;
+    }
+    if ((TIER_RANK[s.tier] ?? 0) > (TIER_RANK[existing.tier] ?? 0)) existing.tier = s.tier;
+    if (!existing.website && s.website) existing.website = s.website;
   }
   return out;
 }
