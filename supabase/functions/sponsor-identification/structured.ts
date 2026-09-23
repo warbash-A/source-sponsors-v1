@@ -172,9 +172,14 @@ function cleanName(raw: string): string {
  * Layer B: scan raw HTML for sponsor sections and read each logo's alt/title
  * text, falling back to the brand implied by the link that wraps it.
  */
-export function extractFromHtmlSections(html: string): Found[] {
+export function extractFromHtmlSections(html: string, pageUrl = ''): Found[] {
   const out: Found[] = [];
   if (!html) return out;
+
+  let pageHost = '';
+  try {
+    pageHost = new URL(pageUrl).hostname.replace(/^www\./, '').toLowerCase();
+  } catch { /* unknown host */ }
 
   // Split the document on headings and sponsor-ish container openings so each
   // chunk carries the tier label that precedes its logos.
@@ -200,17 +205,26 @@ export function extractFromHtmlSections(html: string): Found[] {
     const chunk = html.slice(index, Math.min(end, index + 12000));
     const tier = tierFromHeading(label, sponsorRank);
 
-    // Anchors wrapping logos give both the name and the sponsor's website.
+    // Only anchors that wrap a logo image count — plain text links inside a
+    // sponsor block are navigation, categories or "read more" links.
     for (const a of chunk.matchAll(/<a[^>]+href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]{0,400}?)<\/a>/gi)) {
       const href = a[1];
       const inner = a[2];
+      if (!/<img/i.test(inner)) continue;
+      let host = '';
+      try {
+        host = new URL(href).hostname.replace(/^www\./, '').toLowerCase();
+      } catch { /* ignore */ }
       const alt = inner.match(/alt=["']([^"']+)["']/i)?.[1]
         ?? inner.match(/title=["']([^"']+)["']/i)?.[1]
-        ?? inner.replace(/<[^>]+>/g, ' ');
-      const name = cleanName(alt) || brandFromUrl(href);
+        ?? '';
+      // A link back to the event's own site tells us nothing about the sponsor.
+      const fromHref = host && host !== pageHost ? brandFromUrl(href) : '';
+      const name = cleanName(alt) || fromHref;
       if (!name || SKIP_IMG.test(name)) continue;
-      out.push({ name, tier, website: href });
+      out.push({ name, tier, website: fromHref ? href : '' });
     }
+
 
     // Bare logo images with alt text but no link.
     for (const img of chunk.matchAll(/<img[^>]+>/gi)) {
