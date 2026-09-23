@@ -132,7 +132,8 @@ serve(async (req) => {
 
         // Many sponsor pages show logos as images with little or no text, so always
         // read the logo wall as well and merge what it finds with the text results.
-        const logos = await collectLogoUrls(pages);
+        const logos = aiFailed ? [] : await collectLogoUrls(pages);
+
         if (logos.length > 0) {
           console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
           const fromLogos = await readLogosInBatches(logos, event.name);
