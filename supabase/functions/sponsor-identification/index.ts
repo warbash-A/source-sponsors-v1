@@ -130,12 +130,17 @@ serve(async (req) => {
           console.log(`Trying logo vision for ${event.name} with ${logos.length} image(s)`);
           const fromLogos = await readLogosInBatches(logos, event.name);
           console.log(`Logo vision returned ${fromLogos.length} sponsors for ${event.name}`);
-          const seen = new Set(found.map((s) => s.name.trim().toLowerCase()));
-          for (const s of fromLogos) {
-            const key = s.name.trim().toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            found.push(s);
+          found = mergeSponsors(found, fromLogos);
+        }
+
+        // Some sponsor pages render their logo walls entirely in the browser, so neither
+        // the reader text nor the HTML holds any sponsor. Those pages usually load the
+        // list from a separate data endpoint — read it directly.
+        if (found.length === 0) {
+          const fromData = await collectSponsorsFromDataEndpoints(pages[0].url);
+          if (fromData.length > 0) {
+            console.log(`Data endpoints returned ${fromData.length} sponsors for ${event.name}`);
+            found = mergeSponsors(found, fromData);
           }
         }
 
@@ -143,6 +148,7 @@ serve(async (req) => {
           eventsWithoutSponsors.push(event.name);
           continue;
         }
+
 
         for (const s of found) {
           const name = s.name.trim();
