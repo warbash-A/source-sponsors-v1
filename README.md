@@ -68,6 +68,20 @@ npm i
 npm run dev
 ```
 
+## Performance
+
+- **Event Discovery**: 30-60 seconds for 3-5 events
+- **Sponsor Extraction**: 20-40 seconds per event
+- **Recommended**: Start with 3 events for fastest results
+- **Manual URL Input**: Fastest way to add specific events
+
+## Tips
+
+✅ Use manual URL input for known events (fastest)  
+✅ Start with 3 events, then increase if needed  
+✅ Major conferences work better than small events  
+⚠️ Some events may not list sponsors publicly
+
 ## License
 
 Private project.
