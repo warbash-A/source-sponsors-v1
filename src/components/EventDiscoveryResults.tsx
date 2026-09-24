@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Calendar, MapPin, Users, Plus, Link2 } from "lucide-react";
+import { ExternalLink, Calendar, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,16 +34,15 @@ export function EventDiscoveryResults({
   searchQueries = [],
   onAddEventFromUrl,
 }: EventDiscoveryResultsProps) {
-  const [manualUrl, setManualUrl] = useState("");
+  const [urlInput, setUrlInput] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const handleAddUrl = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualUrl.trim() || !onAddEventFromUrl) return;
+  const handleAddUrl = async () => {
+    if (!urlInput.trim() || !onAddEventFromUrl) return;
     setAdding(true);
     try {
-      await onAddEventFromUrl(manualUrl.trim());
-      setManualUrl("");
+      await onAddEventFromUrl(urlInput.trim());
+      setUrlInput("");
     } finally {
       setAdding(false);
     }
@@ -60,6 +59,45 @@ export function EventDiscoveryResults({
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {onAddEventFromUrl && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg border-2 border-dashed border-primary/30">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-foreground mb-1">
+                ✨ Know a specific event? Paste its URL
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Works with any event website: Luma, Eventbrite, conference sites, etc.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://think.ibm.com/ or https://lu.ma/your-event"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && urlInput.trim()) {
+                      handleAddUrl();
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleAddUrl}
+                  disabled={!urlInput.trim() || adding || isLoading}
+                  variant="default"
+                >
+                  {adding ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    'Add Event'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {events.length} event{events.length === 1 ? '' : 's'} found
@@ -86,34 +124,6 @@ export function EventDiscoveryResults({
             ))}
           </div>
         </div>
-      )}
-
-      {onAddEventFromUrl && (
-        <form onSubmit={handleAddUrl} className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Link2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="url"
-              placeholder="Paste an event URL (Meetup, Luma, conference site...)"
-              value={manualUrl}
-              onChange={(e) => setManualUrl(e.target.value)}
-              className="pl-9 bg-secondary/50 border-border focus:border-primary"
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={!manualUrl.trim() || adding || isLoading}
-            variant="outline"
-            size="sm"
-          >
-            {adding ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Plus className="h-4 w-4 mr-1" />
-            )}
-            Add
-          </Button>
-        </form>
       )}
 
       <div className="space-y-4">

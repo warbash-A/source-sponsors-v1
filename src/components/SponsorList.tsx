@@ -156,6 +156,42 @@ export function SponsorList({ sponsors, showEnrichment = false, onDownload, isDo
         </div>
       </div>
 
+      {sponsors.length > 0 && (
+        <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+          <p className="text-sm text-foreground">
+            Found <span className="font-semibold text-primary">{sponsors.length} sponsors</span> from{' '}
+            <span className="font-semibold">
+              {[...new Set(sponsors.flatMap(s => s.events))].length} events
+            </span>
+          </p>
+          <div className="mt-2 text-xs text-muted-foreground">
+            {Object.entries(
+              sponsors.reduce((acc, sponsor) => {
+                const eventCount = sponsor.events?.length || sponsor.eventCount || 1;
+                const key = `${eventCount} event${eventCount > 1 ? 's' : ''}`;
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+              }, {} as Record<string, number>)
+            ).map(([key, count]) => (
+              <span key={key} className="mr-3">
+                {count} sponsor{count > 1 ? 's' : ''} from {key}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sponsors.length === 0 && (
+        <div className="mb-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">No sponsors found</span> on the selected events.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Tip: Try different events, or manually paste event URLs with known sponsor pages.
+          </p>
+        </div>
+      )}
+
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">

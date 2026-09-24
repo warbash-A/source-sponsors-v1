@@ -135,6 +135,12 @@ export function useSponsorWorkflow() {
   const [researchMode, setResearchMode] = useState<'mine' | 'similar'>(stored.researchMode ?? 'mine');
   const [searchQueries, setSearchQueries] = useState<string[]>(stored.searchQueries ?? []);
   const [isPrescanning, setIsPrescanning] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<{
+    currentEvent: number;
+    totalEvents: number;
+    eventName: string;
+    status: 'idle' | 'processing' | 'complete' | 'error';
+  } | null>(null);
   const workspaceId = readWorkspaceId();
   const [isCloudSynced, setIsCloudSynced] = useState(false);
 
@@ -349,19 +355,34 @@ export function useSponsorWorkflow() {
       setEvents(found);
       updateStepStatus(2, "complete");
 
-      if (found.length > 0) {
+      if (found.length === 0) {
+        toast.warning(
+          lastMessage ??
+          'No events found. Try broader keywords like "tech conference" or manually paste event URLs.',
+          { duration: 6000 }
+        );
+      } else if (found.length > 0) {
         toast.success(`Found ${found.length} event${found.length === 1 ? '' : 's'}`);
         void prescanSponsorCounts(found);
-      } else {
-        toast.warning(
-          lastMessage ?? 'No events found. Try broader keywords, a different location, or paste event URLs directly.'
-        );
       }
     } catch (err) {
       console.error('Event discovery error:', err);
       setEvents([]);
       updateStepStatus(2, "complete");
-      toast.error('Could not reach event discovery. Try again in a moment.');
+
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+      if (errorMessage.includes('timeout')) {
+        toast.error(
+          'Event search timed out. Try broader keywords or manually paste event URLs.',
+          { duration: 6000 }
+        );
+      } else {
+        toast.error(
+          'Could not find events. Try different keywords or use the "Paste Event URL" option.',
+          { duration: 5000 }
+        );
+      }
     } finally {
       setIsLoadingEvents(false);
     }
@@ -430,7 +451,24 @@ export function useSponsorWorkflow() {
       selectedEventIds.includes(e.id)
     );
 
+    setProcessingStatus({
+      currentEvent: 0,
+      totalEvents: selectedEvents.length,
+      eventName: 'Starting...',
+      status: 'processing',
+    });
+
     try {
+      // Update progress - starting sponsor identification
+      setProcessingStatus({
+        currentEvent: 1,
+        totalEvents: selectedEvents.length,
+        eventName: selectedEvents.length > 1
+          ? `${selectedEvents.length} events`
+          : selectedEvents[0].name,
+        status: 'processing',
+      });
+
       const { data: sponsorData, error: sponsorError } = await supabase.functions.invoke('sponsor-identification', {
         body: { events: selectedEvents }
       });
@@ -482,6 +520,16 @@ export function useSponsorWorkflow() {
 
       setSponsors(baseSponsors);
       updateStepStatus(3, "complete");
+      setProcessingStatus({
+        currentEvent: selectedEvents.length,
+        totalEvents: selectedEvents.length,
+        eventName: 'Complete',
+        status: 'complete',
+      });
+
+      // Clear status after 2 seconds
+      setTimeout(() => setProcessingStatus(null), 2000);
+
       setIsLoading(false);
       toast.success(
         `Found ${baseSponsors.length} sponsor${baseSponsors.length === 1 ? '' : 's'}` +
@@ -536,9 +584,35 @@ export function useSponsorWorkflow() {
       }
     } catch (error) {
       console.error('Sponsor identification error:', error);
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (errorMessage.includes('timeout') || errorMessage.includes('fetch')) {
+        toast.error(
+          'Sponsor extraction timed out. Try selecting fewer events or use the "Paste Event URL" option for specific events.',
+          { duration: 6000 }
+        );
+      } else if (errorMessage.includes('429')) {
+        toast.error(
+          'Too many requests. Please wait a moment and try again.',
+          { duration: 5000 }
+        );
+      } else {
+        toast.error(
+          'Could not read sponsors from the selected events. Try manually pasting event URLs instead.',
+          { duration: 5000 }
+        );
+      }
+
       setSponsors([]);
-      toast.error('Could not read sponsors from the selected events.');
       updateStepStatus(3, "complete");
+      setProcessingStatus({
+        currentEvent: 0,
+        totalEvents: 0,
+        eventName: 'Error',
+        status: 'error',
+      });
+      setTimeout(() => setProcessingStatus(null), 3000);
       setIsLoading(false);
     }
   }, [selectedEventIds, events, updateStepStatus]);
@@ -712,6 +786,7 @@ export function useSponsorWorkflow() {
     completedExports,
     researchMode,
     searchQueries,
+    processingStatus,
     handleEventSubmit,
     handleAddEventFromUrl,
     handleToggleEvent,

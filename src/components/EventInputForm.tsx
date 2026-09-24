@@ -58,12 +58,13 @@ const focusTagOptions = [
 
 const sourceOptions: { value: EventSource; label: string; hint: string }[] = [
   { value: "web", label: "Conference sites", hint: "Official event websites" },
-  { value: "luma", label: "Luma events", hint: "Professional tech and startup events" },
+  // Luma discovery needs optimization - temporarily disabled
+  // { value: "luma", label: "Luma events", hint: "Professional tech and startup events" },
 ];
 
 export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInputFormProps) {
   const [selectedSources, setSelectedSources] = useState<EventSource[]>(
-    initialValues?.sources?.length ? initialValues.sources : ["web", "luma"]
+    initialValues?.sources?.length ? initialValues.sources : ["web"]
   );
 
   const toggleSource = (source: EventSource) => {
@@ -82,7 +83,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     focusTags: initialValues?.focusTags ?? [],
   });
 
-  const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
+  const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 3);
 
   const handleChange = (field: keyof EventDetails, value: string | string[] | undefined) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -297,15 +298,15 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
           })}
         </div>
         <p className="text-xs text-muted-foreground">
-          We search conference websites and Luma for professional tech events. You can also paste any
-          event link directly on the next screen.
+          We search conference websites for professional events. You can also paste any
+          event link (including Luma, Eventbrite, etc.) directly on the next screen.
         </p>
       </div>
 
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
         <div className="flex items-center gap-2">
-          {[5, 10].map((count) => (
+          {[3, 5].map((count) => (
             <Button
               key={count}
               type="button"

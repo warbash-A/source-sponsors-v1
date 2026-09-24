@@ -83,7 +83,7 @@ serve(async (req) => {
       }
 
       try {
-        const pages = await collectSponsorPages(event.url);
+        const pages = await collectSponsorPages(event.url, 10000); // 10 second timeout
 
         if (pages.length === 0) {
           console.log('Could not read any page for event:', event.name);
@@ -242,11 +242,14 @@ interface Page { url: string; content: string }
  * Gathers the pages most likely to list sponsors: dedicated sponsor/partner pages
  * linked from the event page, common sponsor URLs, and the event page itself.
  */
-async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
+async function collectSponsorPages(
+  eventUrl: string,
+  timeout = 10000
+): Promise<Page[]> {
   const pages: Page[] = [];
   const tried = new Set<string>();
 
-  const home = await readPage(eventUrl, 30000);
+  const home = await readPage(eventUrl, 30000, timeout);
   if (home) {
     tried.add(eventUrl);
     pages.push({ url: eventUrl, content: home });
@@ -314,7 +317,7 @@ async function collectSponsorPages(eventUrl: string): Promise<Page[]> {
 
   const probed = await Promise.all(
     unique.map(async (url) => {
-      const content = await readPage(url, 20000);
+      const content = await readPage(url, 20000, timeout);
       if (!content) return null;
       if (isNotFound(content)) return null;
       // A probed sub-path can resolve to an unrelated page on multi-event
