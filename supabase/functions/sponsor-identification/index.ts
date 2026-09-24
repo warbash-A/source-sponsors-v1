@@ -83,7 +83,7 @@ serve(async (req) => {
       }
 
       try {
-        const pages = await collectSponsorPages(event.url, 10000); // 10 second timeout
+        const pages = await collectSponsorPages(event.url, 15000); // 15 second timeout for page reads
 
         if (pages.length === 0) {
           console.log('Could not read any page for event:', event.name);
@@ -105,6 +105,7 @@ serve(async (req) => {
             schema: SPONSORS_SCHEMA as unknown as Record<string, unknown>,
             instructions: `${INSTRUCTIONS} The event is "${event.name}".`,
             content,
+            timeoutMs: 10000, // 10 second timeout for sponsor extraction
           });
         } catch (err) {
           if (err instanceof AiGatewayError) {
@@ -244,7 +245,7 @@ interface Page { url: string; content: string }
  */
 async function collectSponsorPages(
   eventUrl: string,
-  timeout = 10000
+  timeout = 15000
 ): Promise<Page[]> {
   const pages: Page[] = [];
   const tried = new Set<string>();
@@ -366,6 +367,7 @@ async function readLogosInBatches(
         instructions: LOGO_INSTRUCTIONS,
         content: `These images are the sponsor/partner logos shown on the page for the event "${eventName}". Name each sponsoring organisation you can read.`,
         imageUrls: batch,
+        timeoutMs: 10000,
       });
       out.push(...(res.sponsors ?? []).filter((s) => isLikelyCompany(s.name)));
     } catch (err) {
