@@ -436,7 +436,24 @@ export function useSponsorWorkflow() {
       selectedEventIds.includes(e.id)
     );
 
+    setProcessingStatus({
+      currentEvent: 0,
+      totalEvents: selectedEvents.length,
+      eventName: 'Starting...',
+      status: 'processing',
+    });
+
     try {
+      // Update progress - starting sponsor identification
+      setProcessingStatus({
+        currentEvent: 1,
+        totalEvents: selectedEvents.length,
+        eventName: selectedEvents.length > 1
+          ? `${selectedEvents.length} events`
+          : selectedEvents[0].name,
+        status: 'processing',
+      });
+
       const { data: sponsorData, error: sponsorError } = await supabase.functions.invoke('sponsor-identification', {
         body: { events: selectedEvents }
       });
@@ -488,6 +505,16 @@ export function useSponsorWorkflow() {
 
       setSponsors(baseSponsors);
       updateStepStatus(3, "complete");
+      setProcessingStatus({
+        currentEvent: selectedEvents.length,
+        totalEvents: selectedEvents.length,
+        eventName: 'Complete',
+        status: 'complete',
+      });
+
+      // Clear status after 2 seconds
+      setTimeout(() => setProcessingStatus(null), 2000);
+
       setIsLoading(false);
       toast.success(
         `Found ${baseSponsors.length} sponsor${baseSponsors.length === 1 ? '' : 's'}` +
@@ -545,6 +572,13 @@ export function useSponsorWorkflow() {
       setSponsors([]);
       toast.error('Could not read sponsors from the selected events.');
       updateStepStatus(3, "complete");
+      setProcessingStatus({
+        currentEvent: 0,
+        totalEvents: 0,
+        eventName: 'Error',
+        status: 'error',
+      });
+      setTimeout(() => setProcessingStatus(null), 3000);
       setIsLoading(false);
     }
   }, [selectedEventIds, events, updateStepStatus]);
