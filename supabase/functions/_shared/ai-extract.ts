@@ -22,9 +22,11 @@ interface ExtractArgs {
   content: string;
   /** Optional image URLs (e.g. sponsor logos) sent alongside the text. */
   imageUrls?: string[];
+  /** Abort the gateway call after this many milliseconds. */
+  timeoutMs?: number;
 }
 
-export async function aiExtract<T>({ name, schema, instructions, content, imageUrls }: ExtractArgs): Promise<T> {
+export async function aiExtract<T>({ name, schema, instructions, content, imageUrls, timeoutMs }: ExtractArgs): Promise<T> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY');
   if (!apiKey) throw new AiGatewayError(401, 'LOVABLE_API_KEY is not configured');
 
@@ -51,6 +53,7 @@ export async function aiExtract<T>({ name, schema, instructions, content, imageU
         json_schema: { name, schema, strict: true },
       },
     }),
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
   });
 
   if (!res.ok) {
