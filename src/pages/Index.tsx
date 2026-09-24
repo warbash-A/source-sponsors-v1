@@ -19,6 +19,7 @@ const Index = () => {
     sponsors,
     researchMode,
     searchQueries,
+    processingStatus,
     handleEventSubmit,
     handleAddEventFromUrl,
     handleToggleEvent,
@@ -107,6 +108,19 @@ const Index = () => {
                   searchQueries={searchQueries}
                   onAddEventFromUrl={handleAddEventFromUrl}
                 />
+                {processingStatus && processingStatus.status === 'processing' && (
+                  <div className="mb-4 p-4 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-3">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Processing event {processingStatus.currentEvent} of {processingStatus.totalEvents}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{processingStatus.eventName}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-6 flex justify-between gap-3">
                   <Button variant="outline" onClick={handleGoBack}>
                     <ArrowLeft className="h-4 w-4 mr-2" />

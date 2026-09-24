@@ -82,7 +82,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
     focusTags: initialValues?.focusTags ?? [],
   });
 
-  const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 10);
+  const [eventCount, setEventCount] = useState<number>(initialValues?.eventCount ?? 3);
 
   const handleChange = (field: keyof EventDetails, value: string | string[] | undefined) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -305,7 +305,7 @@ export function EventInputForm({ onSubmit, isLoading, initialValues }: EventInpu
       <div className="space-y-3">
         <Label className="text-foreground text-sm font-medium">Number of events</Label>
         <div className="flex items-center gap-2">
-          {[5, 10].map((count) => (
+          {[3, 5].map((count) => (
             <Button
               key={count}
               type="button"

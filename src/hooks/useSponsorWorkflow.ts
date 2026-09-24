@@ -135,6 +135,12 @@ export function useSponsorWorkflow() {
   const [researchMode, setResearchMode] = useState<'mine' | 'similar'>(stored.researchMode ?? 'mine');
   const [searchQueries, setSearchQueries] = useState<string[]>(stored.searchQueries ?? []);
   const [isPrescanning, setIsPrescanning] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<{
+    currentEvent: number;
+    totalEvents: number;
+    eventName: string;
+    status: 'idle' | 'processing' | 'complete' | 'error';
+  } | null>(null);
   const workspaceId = readWorkspaceId();
   const [isCloudSynced, setIsCloudSynced] = useState(false);
 
@@ -712,6 +718,7 @@ export function useSponsorWorkflow() {
     completedExports,
     researchMode,
     searchQueries,
+    processingStatus,
     handleEventSubmit,
     handleAddEventFromUrl,
     handleToggleEvent,
