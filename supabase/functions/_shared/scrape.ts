@@ -18,10 +18,17 @@ export function generateId(): string {
  * Fetch a page as markdown through the JinaAI Reader (free, no API key).
  * Returns null when the page is unreachable or protected by a bot check.
  */
-export async function readPage(url: string, maxChars = 30000): Promise<string | null> {
+export async function readPage(
+  url: string,
+  maxChars = 30000,
+  timeoutMs = 15000  // 15 second default timeout
+): Promise<string | null> {
   // The free reader rate-limits bursts with 429s; back off and retry instead of
   // treating a throttled request as "page has no content".
   for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const res = await fetch(`https://r.jina.ai/${url}`, {
         headers: {
@@ -29,8 +36,10 @@ export async function readPage(url: string, maxChars = 30000): Promise<string | 
           // Give client-rendered pages time to hydrate before the markdown is taken.
           'x-timeout': '20',
         },
-        signal: AbortSignal.timeout(45000),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
       if (res.status === 429 || res.status === 503) {
         await res.body?.cancel();
         console.log('Reader throttled, retrying', res.status, url);
@@ -48,6 +57,11 @@ export async function readPage(url: string, maxChars = 30000): Promise<string | 
       }
       return text.substring(0, maxChars);
     } catch (err) {
+      clearTimeout(timeoutId);
+      if ((err as Error).name === 'AbortError') {
+        console.error('JinaAI read timeout for:', url);
+        return null;
+      }
       console.error('Reader error', url, err);
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }
